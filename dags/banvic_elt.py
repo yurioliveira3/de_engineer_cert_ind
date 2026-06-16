@@ -19,8 +19,8 @@ import pendulum
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
-from airflow.sensors.filesystem import FileSensor
 from airflow.providers.postgres.hooks.postgres import PostgresHook
+from airflow.sensors.filesystem import FileSensor
 
 from callbacks import on_task_failure
 

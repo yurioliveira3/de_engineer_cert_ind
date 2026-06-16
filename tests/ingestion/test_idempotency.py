@@ -17,7 +17,6 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-import psycopg2
 import pytest
 import yaml
 
@@ -47,7 +46,7 @@ def test_target_postgres_activate_version_false() -> None:
     """activate_version=false - target-postgres não trava ao receber ACTIVATE_VERSION."""
     config = yaml.safe_load(MELTANO_YML.read_text())
     target_pg = next(
-        l for l in config["plugins"]["loaders"] if l["name"] == "target-postgres"
+        loader for loader in config["plugins"]["loaders"] if loader["name"] == "target-postgres"
     )
     assert target_pg["config"].get("activate_version") is False, (
         "activate_version deve ser false - sem essa config o pipeline quebra com "
@@ -59,7 +58,7 @@ def test_target_postgres_no_record_metadata() -> None:
     """add_record_metadata=false - sem colunas _sdc_* no raw, schema limpo."""
     config = yaml.safe_load(MELTANO_YML.read_text())
     target_pg = next(
-        l for l in config["plugins"]["loaders"] if l["name"] == "target-postgres"
+        loader for loader in config["plugins"]["loaders"] if loader["name"] == "target-postgres"
     )
     assert target_pg["config"].get("add_record_metadata") is False
 
@@ -90,7 +89,7 @@ def test_target_postgres_loads_into_raw_schema() -> None:
     """target-postgres carrega no schema raw (camada Bronze)."""
     config = yaml.safe_load(MELTANO_YML.read_text())
     target_pg = next(
-        l for l in config["plugins"]["loaders"] if l["name"] == "target-postgres"
+        loader for loader in config["plugins"]["loaders"] if loader["name"] == "target-postgres"
     )
     assert target_pg["config"]["default_target_schema"] == "raw"
 

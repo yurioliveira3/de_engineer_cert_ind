@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-import pytest
 from airflow.models import DagBag
 
 DAG_ID = "banvic_elt"
@@ -41,9 +40,11 @@ def test_tags_present(dag) -> None:
     assert dag.tags, "DAG deve ter ao menos uma tag para categorização na UI"
 
 
-def test_schedule_is_daily_cron(dag) -> None:
-    assert dag.schedule_interval == "35 4 * * *", (
-        f"schedule esperado '35 4 * * *', obtido '{dag.schedule_interval}'"
+def test_schedule_is_none(dag) -> None:
+    # schedule=None: projeto educacional — runs disparadas manualmente para demonstração.
+    # Em produção seria "35 4 * * *" (04:35 BRT).
+    assert dag.schedule_interval is None, (
+        f"schedule esperado None (manual), obtido '{dag.schedule_interval}'"
     )
 
 
