@@ -1,0 +1,243 @@
+# Helm values para apache-airflow/airflow (chart oficial)
+# Instalação: helm upgrade --install airflow apache-airflow/airflow -n banvic -f k8s/airflow/values.yaml
+# Pré-requisito: kubectl apply -f k8s/airflow/airflow-db-statefulset.yaml -n banvic
+
+defaultAirflowRepository: banvic-airflow
+defaultAirflowTag: latest
+
+executor: KubernetesExecutor
+
+images:
+  airflow:
+    repository: banvic-airflow
+    tag: latest
+    pullPolicy: IfNotPresent
+
+env:
+- name: AIRFLOW__CORE__DEFAULT_TIMEZONE
+  value: "America/Sao_Paulo"
+- name: AIRFLOW__CORE__LOAD_EXAMPLES
+  value: "false"
+- name: SOURCE_POSTGRES_HOST
+  value: "source-postgres"
+- name: SOURCE_POSTGRES_PORT
+  value: "5432"
+- name: SOURCE_POSTGRES_DB
+  value: "banvic"
+- name: DW_POSTGRES_HOST
+  value: "dw-postgres"
+- name: DW_POSTGRES_PORT
+  value: "5432"
+- name: DW_POSTGRES_DB
+  value: "analytics_dw"
+- name: MELTANO_PROJECT_ROOT
+  value: "/opt/airflow/meltano"
+- name: AIRFLOW_CONN_FS_DEFAULT
+  value: "fs://:@:/?path=%2F"
+
+secret:
+- envName: SOURCE_POSTGRES_USER
+  secretName: banvic-secrets
+  secretKey: SOURCE_POSTGRES_USER
+- envName: SOURCE_POSTGRES_PASSWORD
+  secretName: banvic-secrets
+  secretKey: SOURCE_POSTGRES_PASSWORD
+- envName: DW_POSTGRES_USER
+  secretName: banvic-secrets
+  secretKey: DW_POSTGRES_USER
+- envName: DW_POSTGRES_PASSWORD
+  secretName: banvic-secrets
+  secretKey: DW_POSTGRES_PASSWORD
+- envName: DBT_PASSWORD
+  secretName: banvic-secrets
+  secretKey: DW_POSTGRES_PASSWORD
+# Connection strings usadas pelo Airflow (PostgresHook resolve por AIRFLOW_CONN_<id>).
+- envName: AIRFLOW_CONN_DW_POSTGRES
+  secretName: banvic-secrets
+  secretKey: AIRFLOW_CONN_DW_POSTGRES
+- envName: AIRFLOW_CONN_SOURCE_POSTGRES
+  secretName: banvic-secrets
+  secretKey: AIRFLOW_CONN_SOURCE_POSTGRES
+- envName: AIRFLOW_ADMIN_PASSWORD
+  secretName: banvic-secrets
+  secretKey: AIRFLOW_ADMIN_PASSWORD
+
+# Webserver secret key via mecanismo nativo do chart (evita env var duplicada).
+# O script generate-k8s-secrets.sh popula a chave `webserver-secret-key` em banvic-secrets.
+webserverSecretKeySecretName: banvic-secrets
+
+webserver:
+  service:
+    type: NodePort
+    ports:
+    - name: airflow-ui
+      port: 8080
+      nodePort: 30080
+  defaultUser:
+    enabled: false
+
+# Usar postgres externo (airflow-db StatefulSet com postgres:16)
+postgresql:
+  enabled: false
+
+data:
+  metadataSecretName: airflow-metadata-secret
+
+dags:
+  persistence:
+    enabled: false
+  gitSync:
+    enabled: false
+
+logs:
+  persistence:
+    enabled: false
+
+extraVolumes:
+- name: landing-zone
+  hostPath:
+    path: /mnt/landing-data
+    type: Directory
+
+extraVolumeMounts:
+- name: landing-zone
+  mountPath: /opt/airflow/data/landing
+
+# Pod template explícito para KubernetesExecutor — necessário porque o chart 1.13.0
+# não propaga extraVolumes para o pod template dos task pods automaticamente.
+podTemplate: |
+  ---
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    name: placeholder-name
+    labels:
+      tier: airflow
+      component: worker
+      release: airflow
+  spec:
+    containers:
+      - envFrom: []
+        env:
+          - name: AIRFLOW__CORE__EXECUTOR
+            value: LocalExecutor
+          - name: AIRFLOW__CORE__FERNET_KEY
+            valueFrom:
+              secretKeyRef:
+                name: airflow-fernet-key
+                key: fernet-key
+          - name: AIRFLOW_HOME
+            value: /opt/airflow
+          - name: AIRFLOW__CORE__SQL_ALCHEMY_CONN
+            valueFrom:
+              secretKeyRef:
+                name: airflow-metadata-secret
+                key: connection
+          - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+            valueFrom:
+              secretKeyRef:
+                name: airflow-metadata-secret
+                key: connection
+          - name: AIRFLOW_CONN_AIRFLOW_DB
+            valueFrom:
+              secretKeyRef:
+                name: airflow-metadata-secret
+                key: connection
+          - name: AIRFLOW__WEBSERVER__SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                name: banvic-secrets
+                key: webserver-secret-key
+          - name: AIRFLOW__CORE__DEFAULT_TIMEZONE
+            value: "America/Sao_Paulo"
+          - name: AIRFLOW__CORE__LOAD_EXAMPLES
+            value: "false"
+          - name: SOURCE_POSTGRES_HOST
+            value: "source-postgres"
+          - name: SOURCE_POSTGRES_PORT
+            value: "5432"
+          - name: SOURCE_POSTGRES_DB
+            value: "banvic"
+          - name: DW_POSTGRES_HOST
+            value: "dw-postgres"
+          - name: DW_POSTGRES_PORT
+            value: "5432"
+          - name: DW_POSTGRES_DB
+            value: "analytics_dw"
+          - name: MELTANO_PROJECT_ROOT
+            value: "/opt/airflow/meltano"
+          - name: AIRFLOW_CONN_FS_DEFAULT
+            value: "fs://:@:/?path=%2F"
+          - name: SOURCE_POSTGRES_USER
+            valueFrom:
+              secretKeyRef:
+                name: banvic-secrets
+                key: SOURCE_POSTGRES_USER
+          - name: SOURCE_POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: banvic-secrets
+                key: SOURCE_POSTGRES_PASSWORD
+          - name: DW_POSTGRES_USER
+            valueFrom:
+              secretKeyRef:
+                name: banvic-secrets
+                key: DW_POSTGRES_USER
+          - name: DW_POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: banvic-secrets
+                key: DW_POSTGRES_PASSWORD
+          - name: DBT_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: banvic-secrets
+                key: DW_POSTGRES_PASSWORD
+          - name: AIRFLOW_CONN_DW_POSTGRES
+            valueFrom:
+              secretKeyRef:
+                name: banvic-secrets
+                key: AIRFLOW_CONN_DW_POSTGRES
+          - name: AIRFLOW_CONN_SOURCE_POSTGRES
+            valueFrom:
+              secretKeyRef:
+                name: banvic-secrets
+                key: AIRFLOW_CONN_SOURCE_POSTGRES
+        image: banvic-airflow:latest
+        imagePullPolicy: IfNotPresent
+        name: base
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+        resources: {}
+        volumeMounts:
+          - mountPath: /opt/airflow/logs
+            name: logs
+          - name: config
+            mountPath: /opt/airflow/airflow.cfg
+            subPath: airflow.cfg
+            readOnly: true
+          - name: config
+            mountPath: /opt/airflow/config/airflow_local_settings.py
+            subPath: airflow_local_settings.py
+            readOnly: true
+          - mountPath: /opt/airflow/data/landing
+            name: landing-zone
+    restartPolicy: Never
+    securityContext:
+      runAsUser: 50000
+      fsGroup: 0
+    terminationGracePeriodSeconds: 600
+    serviceAccountName: airflow-worker
+    volumes:
+      - emptyDir: {}
+        name: logs
+      - configMap:
+          name: airflow-config
+        name: config
+      - hostPath:
+          path: /mnt/landing-data
+          type: Directory
+        name: landing-zone

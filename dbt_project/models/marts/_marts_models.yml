@@ -1,0 +1,195 @@
+version: 2
+
+models:
+  - name: fct_funil_credito
+    description: "Credit proposal funnel aggregated by month and status."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - month
+            - proposal_status
+    columns:
+      - name: month
+        tests:
+          - not_null
+      - name: proposal_status
+        tests:
+          - not_null
+
+  - name: fct_performance_agencia
+    description: "Agency-level credit proposal performance and conversion rates."
+    columns:
+      - name: agency_id
+        tests:
+          - unique
+          - not_null
+
+  - name: fct_volume_diario_transacoes
+    description: "Daily transaction volume by type with per-account averages."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - transaction_date
+            - transaction_type
+    columns:
+      - name: transaction_date
+        tests:
+          - not_null
+      - name: transaction_type
+        tests:
+          - not_null
+
+  - name: fct_atividade_contas
+    description: "Account activity classification (active, dormant, never_used)."
+    columns:
+      - name: account_id
+        tests:
+          - unique
+          - not_null
+      - name: activity_status
+        tests:
+          - accepted_values:
+              values: ['active', 'dormant', 'never_used']
+
+  - name: mart_kpi_resumo_credito
+    description: "Single-row summary table with pre-computed credit KPIs. Zero aggregation needed in BI."
+    tests:
+      - dbt_utils.expression_is_true:
+          expression: "total_proposals = approved_proposals + rejected_proposals"
+    columns:
+      - name: total_proposals
+        tests:
+          - not_null
+      - name: approval_rate_pct
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              inclusive: true
+      - name: total_financed_amount
+        tests:
+          - not_null
+
+  - name: meta_models
+    description: "Live catalog of all models across Bronze/Silver/Gold layers with row counts, sizes, and medallion classification."
+    columns:
+      - name: model_name
+        tests:
+          - unique
+          - not_null
+      - name: schema_name
+        tests:
+          - not_null
+      - name: medallion_layer
+        tests:
+          - not_null
+
+  - name: meta_data_quality
+    description: "Live data quality dashboard - shows PASS/FAIL status for key tests (relationships, not_null, unique). Queries the actual data, not just definitions."
+    columns:
+      - name: model_name
+        tests:
+          - not_null
+      - name: status
+        tests:
+          - not_null
+
+  - name: mart_oportunidade_crosssell
+    description: "Clients with high balance and zero approved credit proposals - cross-sell opportunities."
+    columns:
+      - name: client_id
+        tests:
+          - unique
+          - not_null
+      - name: account_id
+        tests:
+          - not_null
+      - name: total_balance
+        tests:
+          - not_null
+
+  - name: mart_engajamento_cliente
+    description: >
+      Engajamento comercial por cliente (narrativa Camila): número de transações,
+      recência, status de engajamento (active/at_risk/churned/never_used), saldo
+      total e posse de crédito aprovado. Grão: 1 linha por cliente com conta.
+    columns:
+      - name: client_id
+        tests:
+          - unique
+          - not_null
+      - name: account_count
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              inclusive: true
+      - name: transaction_count
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              inclusive: true
+      - name: engagement_status
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['active', 'at_risk', 'churned', 'never_used']
+      - name: has_approved_credit
+        tests:
+          - not_null
+
+  - name: mart_kpi_comercial
+    description: >
+      KPIs comerciais agregados (single-row) para o dashboard da Camila: total de
+      clientes, ativos, em risco, churned, taxa de inativos e média de transações
+      por cliente. Pré-computado para zero agregação no BI.
+    tests:
+      - dbt_utils.expression_is_true:
+          expression: >
+            total_clientes = clientes_ativos + clientes_em_risco
+            + clientes_churned + clientes_sem_uso
+    columns:
+      - name: total_clientes
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              inclusive: true
+      - name: taxa_ativos_pct
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              inclusive: true
+      - name: taxa_inativos_pct
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+              inclusive: true
+
+  - name: mart_ranking_alavancas
+    description: >
+      Ranking quantitativo de alavancas (narrativa CEO Sofia): correlação de Pearson
+      entre drivers candidatos e a métrica-alvo (transações por cliente), com
+      t-statistic e flag de significância a 5%. Ordenável por impact_rank.
+    columns:
+      - name: driver
+        tests:
+          - unique
+          - not_null
+      - name: impact_rank
+        tests:
+          - unique
+          - not_null
+      - name: sample_size
+        tests:
+          - not_null
+      - name: direction
+        tests:
+          - accepted_values:
+              values: ['positivo', 'negativo', 'indefinido']

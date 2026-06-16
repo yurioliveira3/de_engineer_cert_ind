@@ -1,0 +1,35 @@
+[sqlfluff]
+templater = jinja
+dialect = postgres
+max_line_length = 100
+# Modelos dbt terminam com `select * from cte` (idioma padrão) -> AM04 não se aplica
+# RF04: `month`/`year` como nomes de coluna são idiomáticos em modelos analíticos
+exclude_rules = AM04, RF01, ST06, RF04
+
+[sqlfluff:indentation]
+tab_space_size = 4
+indent_unit = space
+
+[sqlfluff:templater:jinja]
+apply_dbt_builtins = true
+
+[sqlfluff:rules:aliasing.table]
+aliasing = implicit
+
+[sqlfluff:layout:type:comma]
+line_position = trailing
+
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.functions]
+extended_capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.identifiers]
+extended_capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.literals]
+capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.types]
+extended_capitalisation_policy = lower

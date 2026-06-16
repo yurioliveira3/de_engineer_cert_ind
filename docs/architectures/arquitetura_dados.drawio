@@ -1,0 +1,520 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="Electron" version="21.0.0">
+  <diagram id="arq_banvic_001" name="Arquitetura de Dados">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" page="1"
+                  pageWidth="2480" pageHeight="1480" math="0" shadow="1">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             TÍTULO
+        ═══════════════════════════════════════════════════════════════════ -->
+        <mxCell id="t1" value="Arquitetura de Dados — BanVic (Banco Vitória S.A.)"
+          style="text;html=1;fontSize=22;fontStyle=1;fillColor=none;strokeColor=none;align=center;fontColor=#1A252F;"
+          vertex="1" parent="1">
+          <mxGeometry x="400" y="10" width="1400" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="t2" value="Stack: Apache Airflow 2.9.2 · Meltano 3.9.3 · dbt Core 1.9 · PostgreSQL 16 · Metabase"
+          style="text;html=1;fontSize=11;fontStyle=2;fillColor=none;strokeColor=none;align=center;fontColor=#5D6D7E;"
+          vertex="1" parent="1">
+          <mxGeometry x="400" y="48" width="1400" height="22" as="geometry"/>
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             ZONA 1 — FONTES DE DADOS
+        ═══════════════════════════════════════════════════════════════════ -->
+        <mxCell id="z_fontes" value=""
+          style="rounded=1;arcSize=2;fillColor=#D6EAF8;strokeColor=#2E86C1;strokeWidth=2;opacity=60;"
+          vertex="1" parent="1">
+          <mxGeometry x="20" y="78" width="1570" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="z_fontes_hdr" value="FONTES DE DADOS"
+          style="text;html=1;fontSize=13;fontStyle=1;fillColor=none;strokeColor=none;fontColor=#1A5276;"
+          vertex="1" parent="1">
+          <mxGeometry x="34" y="82" width="240" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- Source Postgres -->
+        <mxCell id="c_sp" value="&lt;b&gt;Source Postgres (ERP Simulado)&lt;/b&gt;&lt;br/&gt;postgres:16 · porta 5432&lt;br/&gt;&lt;br/&gt;agencias · clientes · colaboradores&lt;br/&gt;colaborador_agencia · contas&lt;br/&gt;propostas_credito"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2E86C1;fontSize=10;
+                 fontColor=#1A5276;align=center;verticalAlign=middle;strokeWidth=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="40" y="106" width="680" height="152" as="geometry"/>
+        </mxCell>
+
+        <!-- Landing Zone -->
+        <mxCell id="c_lz" value="&lt;b&gt;Data Landing Zone&lt;/b&gt;&lt;br/&gt;Sistema externo · deposita arquivo diariamente&lt;br/&gt;&lt;br/&gt;/data/landing/transacoes.csv&lt;br/&gt;&lt;br/&gt;Detectado via FileSensor (Airflow)"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2E86C1;fontSize=10;
+                 fontColor=#1A5276;align=center;verticalAlign=middle;strokeWidth=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="760" y="106" width="810" height="152" as="geometry"/>
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             ZONA 2 — ORQUESTRAÇÃO (Airflow + Meltano)
+        ═══════════════════════════════════════════════════════════════════ -->
+        <mxCell id="z_orch" value=""
+          style="rounded=1;arcSize=1;fillColor=#E8DAEF;strokeColor=#8E44AD;strokeWidth=2;opacity=60;"
+          vertex="1" parent="1">
+          <mxGeometry x="20" y="296" width="1570" height="370" as="geometry"/>
+        </mxCell>
+        <mxCell id="z_orch_hdr" value="ORQUESTRAÇÃO + INGESTÃO"
+          style="text;html=1;fontSize=13;fontStyle=1;fillColor=none;strokeColor=none;fontColor=#512E5F;"
+          vertex="1" parent="1">
+          <mxGeometry x="34" y="300" width="320" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="z_orch_sub" value="Apache Airflow 2.9.2 · DAG: banvic_elt · schedule=&quot;35 4 * * *&quot; (04:35 BRT) · catchup=False · max_active_runs=1 · retries=2 · retry_exponential_backoff=True · on_failure_callback"
+          style="text;html=1;fontSize=9;fontStyle=2;fillColor=none;strokeColor=none;fontColor=#6C3483;align=left;"
+          vertex="1" parent="1">
+          <mxGeometry x="34" y="322" width="1200" height="18" as="geometry"/>
+        </mxCell>
+
+        <!-- DAG Task: FileSensor -->
+        <mxCell id="c_fs" value="&lt;b&gt;wait_transacoes_csv&lt;/b&gt;&lt;br/&gt;FileSensor&lt;br/&gt;─────────────&lt;br/&gt;poke_interval=30s&lt;br/&gt;timeout=300s&lt;br/&gt;mode=reschedule&lt;br/&gt;soft_fail=False"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#8E44AD;fontSize=9;
+                 fontColor=#512E5F;align=center;verticalAlign=middle;strokeWidth=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="42" y="346" width="170" height="160" as="geometry"/>
+        </mxCell>
+
+        <!-- DAG Task: el_sql -->
+        <mxCell id="c_el_sql" value="&lt;b&gt;el_extract_load_sql&lt;/b&gt;&lt;br/&gt;BashOperator&lt;br/&gt;─────────────&lt;br/&gt;meltano run el-sql&lt;br/&gt;(tap-postgres → target-pg)"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#8E44AD;fontSize=9;
+                 fontColor=#512E5F;align=center;verticalAlign=middle;strokeWidth=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="260" y="346" width="190" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- DAG Task: el_csv -->
+        <mxCell id="c_el_csv" value="&lt;b&gt;el_extract_load_csv&lt;/b&gt;&lt;br/&gt;BashOperator&lt;br/&gt;─────────────&lt;br/&gt;meltano run el-csv&lt;br/&gt;(tap-csv → target-pg)"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#8E44AD;fontSize=9;
+                 fontColor=#512E5F;align=center;verticalAlign=middle;strokeWidth=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="260" y="484" width="190" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- DAG Task: validate_raw_load -->
+        <mxCell id="c_val" value="&lt;b&gt;validate_raw_load&lt;/b&gt;&lt;br/&gt;PythonOperator&lt;br/&gt;─────────────&lt;br/&gt;COUNT(*) &gt; 0&lt;br/&gt;em 7 tabelas raw&lt;br/&gt;early-fail gate"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FDFEFE;strokeColor=#8E44AD;fontSize=9;
+                 fontColor=#512E5F;align=center;verticalAlign=middle;strokeWidth=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="500" y="380" width="190" height="140" as="geometry"/>
+        </mxCell>
+
+        <!-- DAG Task: dbt_run -->
+        <mxCell id="c_dbt_run" value="&lt;b&gt;dbt_run&lt;/b&gt;&lt;br/&gt;BashOperator&lt;br/&gt;─────────────&lt;br/&gt;dbt deps &amp;amp;&amp;amp;&lt;br/&gt;dbt run&lt;br/&gt;(staging + marts)"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#8E44AD;fontSize=9;
+                 fontColor=#512E5F;align=center;verticalAlign=middle;strokeWidth=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="740" y="380" width="190" height="140" as="geometry"/>
+        </mxCell>
+
+        <!-- DAG Task: dbt_test -->
+        <mxCell id="c_dbt_test" value="&lt;b&gt;dbt_test&lt;/b&gt;&lt;br/&gt;BashOperator&lt;br/&gt;─────────────&lt;br/&gt;dbt test&lt;br/&gt;(40+ testes de&lt;br/&gt;qualidade)"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#8E44AD;fontSize=9;
+                 fontColor=#512E5F;align=center;verticalAlign=middle;strokeWidth=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="980" y="380" width="190" height="140" as="geometry"/>
+        </mxCell>
+
+        <!-- Meltano sub-box -->
+        <mxCell id="c_meltano" value="&lt;b&gt;Meltano 3.9.3 (Singer Protocol)&lt;/b&gt;&lt;br/&gt;─────────────────────────────────&lt;br/&gt;&lt;b&gt;tap-postgres&lt;/b&gt;  FULL_TABLE · 6 tabelas&lt;br/&gt;&lt;b&gt;tap-csv&lt;/b&gt;  transacoes.csv · full load&lt;br/&gt;&lt;b&gt;target-postgres&lt;/b&gt;  schema=raw&lt;br/&gt;activate_version=false&lt;br/&gt;add_record_metadata=false"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FDEBD0;strokeColor=#E67E22;fontSize=10;
+                 fontColor=#6E2C0E;align=left;spacingLeft=10;verticalAlign=middle;strokeWidth=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="1220" y="340" width="350" height="220" as="geometry"/>
+        </mxCell>
+
+        <!-- DAG arrows (dentro da zona) -->
+        <!-- FS → el_sql -->
+        <mxCell id="a_fs_sql" value=""
+          style="endArrow=block;endFill=1;strokeColor=#8E44AD;strokeWidth=2;exitX=1;exitY=0.4;entryX=0;entryY=0.5;"
+          edge="1" source="c_fs" target="c_el_sql" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- FS → el_csv -->
+        <mxCell id="a_fs_csv" value=""
+          style="endArrow=block;endFill=1;strokeColor=#8E44AD;strokeWidth=2;exitX=1;exitY=0.8;entryX=0;entryY=0.5;"
+          edge="1" source="c_fs" target="c_el_csv" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- el_sql → validate_raw -->
+        <mxCell id="a_sql_val" value=""
+          style="endArrow=block;endFill=1;strokeColor=#8E44AD;strokeWidth=2;"
+          edge="1" source="c_el_sql" target="c_val" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- el_csv → validate_raw -->
+        <mxCell id="a_csv_val" value=""
+          style="endArrow=block;endFill=1;strokeColor=#8E44AD;strokeWidth=2;"
+          edge="1" source="c_el_csv" target="c_val" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- validate_raw → dbt_run -->
+        <mxCell id="a_val_run" value=""
+          style="endArrow=block;endFill=1;strokeColor=#8E44AD;strokeWidth=2;"
+          edge="1" source="c_val" target="c_dbt_run" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- dbt_run → dbt_test -->
+        <mxCell id="a_run_test" value=""
+          style="endArrow=block;endFill=1;strokeColor=#8E44AD;strokeWidth=2;"
+          edge="1" source="c_dbt_run" target="c_dbt_test" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- el_sql/el_csv → Meltano (invocam) -->
+        <mxCell id="a_sql_mel" value="invoca"
+          style="endArrow=open;endFill=0;strokeColor=#E67E22;strokeWidth=1.5;dashed=1;
+                 exitX=1;exitY=0.5;entryX=0;entryY=0.4;fontSize=9;fontColor=#E67E22;"
+          edge="1" source="c_el_sql" target="c_meltano" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_csv_mel" value="invoca"
+          style="endArrow=open;endFill=0;strokeColor=#E67E22;strokeWidth=1.5;dashed=1;
+                 exitX=1;exitY=0.5;entryX=0;entryY=0.7;fontSize=9;fontColor=#E67E22;"
+          edge="1" source="c_el_csv" target="c_meltano" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             ZONA 3 — DATA WAREHOUSE (PostgreSQL 16)
+        ═══════════════════════════════════════════════════════════════════ -->
+        <mxCell id="z_dw" value=""
+          style="rounded=1;arcSize=1;fillColor=#D5F5E3;strokeColor=#1E8449;strokeWidth=2;opacity=60;"
+          vertex="1" parent="1">
+          <mxGeometry x="20" y="684" width="1570" height="540" as="geometry"/>
+        </mxCell>
+        <mxCell id="z_dw_hdr" value="DATA WAREHOUSE — PostgreSQL 16 · analytics_dw · porta 5433"
+          style="text;html=1;fontSize=13;fontStyle=1;fillColor=none;strokeColor=none;fontColor=#145A32;"
+          vertex="1" parent="1">
+          <mxGeometry x="34" y="688" width="700" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- Schema raw (Bronze) -->
+        <mxCell id="c_raw" value="&lt;b&gt;raw&lt;/b&gt; — Bronze&lt;br/&gt;═══════════════&lt;br/&gt;agencias&lt;br/&gt;clientes&lt;br/&gt;colaboradores&lt;br/&gt;colaborador_agencia&lt;br/&gt;contas&lt;br/&gt;propostas_credito&lt;br/&gt;transacoes&lt;br/&gt;&lt;br/&gt;7 tabelas · Meltano (FULL_TABLE)&lt;br/&gt;DROP + INSERT a cada execução"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF3E2;strokeColor=#E67E22;fontSize=10;
+                 fontColor=#784212;align=center;verticalAlign=middle;strokeWidth=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="40" y="718" width="310" height="480" as="geometry"/>
+        </mxCell>
+
+        <!-- Schema staging (Silver) -->
+        <mxCell id="c_stg" value="&lt;b&gt;staging&lt;/b&gt; — Silver&lt;br/&gt;═══════════════&lt;br/&gt;stg_agencias&lt;br/&gt;stg_clientes&lt;br/&gt;stg_colaboradores&lt;br/&gt;stg_colaborador_agencia&lt;br/&gt;stg_contas&lt;br/&gt;stg_propostas_credito&lt;br/&gt;stg_transacoes&lt;br/&gt;&lt;br/&gt;7 views · dbt (materialized=view)&lt;br/&gt;rename + type cast + clean&lt;br/&gt;&lt;br/&gt;Testes dbt:&lt;br/&gt;unique · not_null · relationships&lt;br/&gt;accepted_values"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EBF5FB;strokeColor=#2980B9;fontSize=10;
+                 fontColor=#1A5276;align=center;verticalAlign=middle;strokeWidth=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="380" y="718" width="310" height="480" as="geometry"/>
+        </mxCell>
+
+        <!-- Schema marts (Gold) -->
+        <mxCell id="c_mrt" value="&lt;b&gt;marts&lt;/b&gt; — Gold&lt;br/&gt;═══════════════&lt;br/&gt;&lt;b&gt;fct_atividade_contas&lt;/b&gt; [table]&lt;br/&gt;&lt;b&gt;fct_funil_credito&lt;/b&gt; [table]&lt;br/&gt;&lt;b&gt;fct_performance_agencia&lt;/b&gt; [table]&lt;br/&gt;&lt;b&gt;fct_volume_diario_transacoes&lt;/b&gt; [table]&lt;br/&gt;&lt;b&gt;mart_kpi_resumo_credito&lt;/b&gt; [table]&lt;br/&gt;&lt;b&gt;mart_oportunidade_crosssell&lt;/b&gt; [table]&lt;br/&gt;&lt;b&gt;meta_data_quality&lt;/b&gt; [view]&lt;br/&gt;&lt;b&gt;meta_models&lt;/b&gt; [view]&lt;br/&gt;&lt;br/&gt;dbt (materialized=table) → DROP+CREATE&lt;br/&gt;idempotente por design&lt;br/&gt;&lt;br/&gt;Testes dbt:&lt;br/&gt;unique_combination · not_null&lt;br/&gt;accepted_values · expression_is_true&lt;br/&gt;(dbt_utils)"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF9E7;strokeColor=#D4AC0D;fontSize=10;
+                 fontColor=#7E5109;align=center;verticalAlign=middle;strokeWidth=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="720" y="718" width="340" height="480" as="geometry"/>
+        </mxCell>
+
+        <!-- Schema metadata -->
+        <mxCell id="c_meta" value="&lt;b&gt;metadata&lt;/b&gt;&lt;br/&gt;══════════════════&lt;br/&gt;&lt;b&gt;test_results&lt;/b&gt;&lt;br/&gt;(test_name, model_name,&lt;br/&gt; column_name, status,&lt;br/&gt; message, executed_at)&lt;br/&gt;&lt;br/&gt;&lt;b&gt;model_runs&lt;/b&gt;&lt;br/&gt;(model_name, schema,&lt;br/&gt; row_count, status,&lt;br/&gt; executed_at)&lt;br/&gt;&lt;br/&gt;Populado via macro&lt;br/&gt;populate_test_results()&lt;br/&gt;on-run-end do dbt"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F6F7;strokeColor=#566573;fontSize=10;
+                 fontColor=#2C3E50;align=center;verticalAlign=middle;strokeWidth=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="1100" y="718" width="290" height="310" as="geometry"/>
+        </mxCell>
+
+        <!-- dbt Core box (dentro da zona DW, ao lado de metadata) -->
+        <mxCell id="c_dbt" value="&lt;b&gt;dbt Core 1.9&lt;/b&gt;&lt;br/&gt;══════════════════&lt;br/&gt;profile: analytics&lt;br/&gt;adapter: dbt-postgres&lt;br/&gt;&lt;br/&gt;staging/ → view&lt;br/&gt;marts/ → table&lt;br/&gt;&lt;br/&gt;Macros:&lt;br/&gt;populate_test_results()&lt;br/&gt;generate_schema_name()&lt;br/&gt;&lt;br/&gt;on-run-end:&lt;br/&gt;populate_test_results()"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5F5E3;strokeColor=#1E8449;fontSize=10;
+                 fontColor=#145A32;align=center;verticalAlign=middle;strokeWidth=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="1100" y="1048" width="290" height="154" as="geometry"/>
+        </mxCell>
+
+        <!-- Setas dentro da zona DW -->
+        <!-- raw → staging -->
+        <mxCell id="a_raw_stg" value="dbt run"
+          style="endArrow=block;endFill=1;strokeColor=#2980B9;strokeWidth=2;fontSize=9;fontColor=#1A5276;"
+          edge="1" source="c_raw" target="c_stg" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- staging → marts -->
+        <mxCell id="a_stg_mrt" value="dbt run"
+          style="endArrow=block;endFill=1;strokeColor=#D4AC0D;strokeWidth=2;fontSize=9;fontColor=#7E5109;"
+          edge="1" source="c_stg" target="c_mrt" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- marts → metadata (populate_test_results) -->
+        <mxCell id="a_mrt_meta" value="dbt test&lt;br/&gt;→ INSERT"
+          style="endArrow=block;endFill=1;strokeColor=#566573;strokeWidth=1.5;dashed=1;fontSize=9;fontColor=#2C3E50;"
+          edge="1" source="c_mrt" target="c_meta" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- dbt Core → dbt_run task annotation -->
+        <mxCell id="a_dbt_run2" value="executa"
+          style="endArrow=open;endFill=0;strokeColor=#1E8449;strokeWidth=1.5;dashed=1;fontSize=9;
+                 fontColor=#145A32;exitX=0.5;exitY=0;entryX=0.5;entryY=1;"
+          edge="1" source="c_dbt" target="c_dbt_run" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             ZONA 4 — SERVING
+        ═══════════════════════════════════════════════════════════════════ -->
+        <mxCell id="z_srv" value=""
+          style="rounded=1;arcSize=2;fillColor=#FDEDEC;strokeColor=#C0392B;strokeWidth=2;opacity=60;"
+          vertex="1" parent="1">
+          <mxGeometry x="20" y="1242" width="1570" height="170" as="geometry"/>
+        </mxCell>
+        <mxCell id="z_srv_hdr" value="SERVING &amp; OBSERVABILIDADE"
+          style="text;html=1;fontSize=13;fontStyle=1;fillColor=none;strokeColor=none;fontColor=#922B21;"
+          vertex="1" parent="1">
+          <mxGeometry x="34" y="1246" width="340" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- Metabase -->
+        <mxCell id="c_mb" value="&lt;b&gt;Metabase&lt;/b&gt;&lt;br/&gt;http://localhost:3000&lt;br/&gt;&lt;br/&gt;Dashboard BI · Conecta a marts.*&lt;br/&gt;Banco: metabase_app (porta 5433)"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C0392B;fontSize=10;
+                 fontColor=#922B21;align=center;verticalAlign=middle;strokeWidth=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="40" y="1270" width="480" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- dbt docs -->
+        <mxCell id="c_dbtdocs" value="&lt;b&gt;dbt docs&lt;/b&gt;&lt;br/&gt;http://localhost:8080&lt;br/&gt;&lt;br/&gt;Documentação gerada · Catálogo de modelos&lt;br/&gt;Lineage graph · Test results"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C0392B;fontSize=10;
+                 fontColor=#922B21;align=center;verticalAlign=middle;strokeWidth=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="560" y="1270" width="480" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- meta_data_quality view -->
+        <mxCell id="c_mdq" value="&lt;b&gt;meta_data_quality&lt;/b&gt;&lt;br/&gt;[view — dbt]&lt;br/&gt;&lt;br/&gt;Dashboard de qualidade&lt;br/&gt;PASS/FAIL por modelo&lt;br/&gt;(not_null, unique, relationships)"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C0392B;fontSize=10;
+                 fontColor=#922B21;align=center;verticalAlign=middle;strokeWidth=2;"
+          vertex="1" parent="1">
+          <mxGeometry x="1080" y="1270" width="490" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             SETAS INTER-ZONAS (principais fluxos)
+        ═══════════════════════════════════════════════════════════════════ -->
+        <!-- Source Postgres → Meltano (tap-postgres) -->
+        <mxCell id="a_sp_mel" value="tap-postgres · FULL_TABLE"
+          style="endArrow=block;endFill=1;strokeColor=#E67E22;strokeWidth=2;fontSize=9;
+                 fontColor=#784212;exitX=0.5;exitY=1;entryX=0;entryY=0.3;"
+          edge="1" source="c_sp" target="c_meltano" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="380" y="284"/>
+              <mxPoint x="1220" y="284"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <!-- Landing Zone → Meltano (tap-csv) -->
+        <mxCell id="a_lz_mel" value="tap-csv"
+          style="endArrow=block;endFill=1;strokeColor=#E67E22;strokeWidth=2;fontSize=9;
+                 fontColor=#784212;exitX=1;exitY=0.5;entryX=0;entryY=0.7;"
+          edge="1" source="c_lz" target="c_meltano" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- Meltano → raw schema (target-postgres) -->
+        <mxCell id="a_mel_raw" value="FULL_TABLE → raw.*"
+          style="endArrow=block;endFill=1;strokeColor=#E67E22;strokeWidth=2;fontSize=9;
+                 fontColor=#784212;exitX=0.2;exitY=1;entryX=0.5;entryY=0;"
+          edge="1" source="c_meltano" target="c_raw" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- dbt_run task → staging (cria views) -->
+        <mxCell id="a_dbt_stg" value="CREATE VIEW"
+          style="endArrow=block;endFill=1;strokeColor=#2980B9;strokeWidth=2;fontSize=9;
+                 fontColor=#1A5276;exitX=0.4;exitY=1;entryX=0.5;entryY=0;"
+          edge="1" source="c_dbt_run" target="c_stg" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- dbt_run task → marts (cria tabelas) -->
+        <mxCell id="a_dbt_mrt" value="DROP + CREATE TABLE"
+          style="endArrow=block;endFill=1;strokeColor=#D4AC0D;strokeWidth=2;fontSize=9;
+                 fontColor=#7E5109;exitX=0.6;exitY=1;entryX=0.5;entryY=0;"
+          edge="1" source="c_dbt_run" target="c_mrt" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- dbt_test → metadata (populate_test_results) -->
+        <mxCell id="a_dbt_meta" value="populate_test_results()"
+          style="endArrow=block;endFill=1;strokeColor=#566573;strokeWidth=1.5;fontSize=9;
+                 fontColor=#2C3E50;dashed=1;exitX=1;exitY=1;entryX=0.5;entryY=0;"
+          edge="1" source="c_dbt_test" target="c_meta" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- marts → Metabase -->
+        <mxCell id="a_mrt_mb" value="SQL queries"
+          style="endArrow=block;endFill=1;strokeColor=#C0392B;strokeWidth=2;fontSize=9;
+                 fontColor=#922B21;exitX=0.3;exitY=1;entryX=0.5;entryY=0;"
+          edge="1" source="c_mrt" target="c_mb" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- marts → dbt docs -->
+        <mxCell id="a_mrt_docs" value="dbt docs generate"
+          style="endArrow=block;endFill=1;strokeColor=#C0392B;strokeWidth=1.5;fontSize=9;
+                 fontColor=#922B21;dashed=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;"
+          edge="1" source="c_mrt" target="c_dbtdocs" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             ZONA 5 — CI/CD (coluna direita)
+        ═══════════════════════════════════════════════════════════════════ -->
+        <mxCell id="z_cicd" value=""
+          style="rounded=1;arcSize=2;fillColor=#F2F3F4;strokeColor=#5D6D7E;strokeWidth=2;opacity=70;"
+          vertex="1" parent="1">
+          <mxGeometry x="1612" y="78" width="846" height="400" as="geometry"/>
+        </mxCell>
+        <mxCell id="z_cicd_hdr" value="CI/CD — GitHub Actions"
+          style="text;html=1;fontSize=13;fontStyle=1;fillColor=none;strokeColor=none;fontColor=#2C3E50;"
+          vertex="1" parent="1">
+          <mxGeometry x="1626" y="82" width="280" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- Job 1: lint -->
+        <mxCell id="c_j1" value="&lt;b&gt;Job 1 — Lint&lt;/b&gt;&lt;br/&gt;─────────────────&lt;br/&gt;ruff check dags/ tests/&lt;br/&gt;(ruff 0.4.*)&lt;br/&gt;&lt;br/&gt;yamllint meltano.yml&lt;br/&gt;docker-compose.yml&lt;br/&gt;(yamllint 1.35.*)"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#5D6D7E;fontSize=9;
+                 fontColor=#2C3E50;align=center;verticalAlign=middle;strokeWidth=1.5;"
+          vertex="1" parent="1">
+          <mxGeometry x="1628" y="112" width="190" height="146" as="geometry"/>
+        </mxCell>
+        <!-- Job 2: dag-tests -->
+        <mxCell id="c_j2" value="&lt;b&gt;Job 2 — Testes unitários&lt;/b&gt;&lt;br/&gt;─────────────────&lt;br/&gt;Instala Airflow 2.9.2&lt;br/&gt;+ constraint file&lt;br/&gt;&lt;br/&gt;pytest tests/&lt;br/&gt;-m &quot;not integration&quot;&lt;br/&gt;(41 testes unit)&lt;br/&gt;&lt;br/&gt;Sem banco de dados"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#5D6D7E;fontSize=9;
+                 fontColor=#2C3E50;align=center;verticalAlign=middle;strokeWidth=1.5;"
+          vertex="1" parent="1">
+          <mxGeometry x="1840" y="112" width="200" height="146" as="geometry"/>
+        </mxCell>
+        <!-- Job 3: dbt-parse -->
+        <mxCell id="c_j3" value="&lt;b&gt;Job 3 — dbt parse&lt;/b&gt;&lt;br/&gt;─────────────────&lt;br/&gt;pip install dbt-postgres 1.9.*&lt;br/&gt;&lt;br/&gt;dbt deps&lt;br/&gt;dbt parse&lt;br/&gt;&lt;br/&gt;Valida compilação&lt;br/&gt;sem executar SQL&lt;br/&gt;DBT_PASSWORD=ci_placeholder"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#5D6D7E;fontSize=9;
+                 fontColor=#2C3E50;align=center;verticalAlign=middle;strokeWidth=1.5;"
+          vertex="1" parent="1">
+          <mxGeometry x="1628" y="278" width="190" height="180" as="geometry"/>
+        </mxCell>
+        <!-- Job 4: meltano-config -->
+        <mxCell id="c_j4" value="&lt;b&gt;Job 4 — Meltano Config&lt;/b&gt;&lt;br/&gt;─────────────────&lt;br/&gt;Valida meltano.yml:&lt;br/&gt;· tap-postgres presente&lt;br/&gt;· tap-csv presente&lt;br/&gt;· target-postgres presente&lt;br/&gt;· activate_version=false&lt;br/&gt;· add_record_metadata=false&lt;br/&gt;· Sem segredos em texto claro&lt;br/&gt;· Jobs el-sql e el-csv definidos"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#5D6D7E;fontSize=9;
+                 fontColor=#2C3E50;align=center;verticalAlign=middle;strokeWidth=1.5;"
+          vertex="1" parent="1">
+          <mxGeometry x="1840" y="278" width="200" height="180" as="geometry"/>
+        </mxCell>
+        <!-- push trigger label -->
+        <mxCell id="c_cicd_trigger" value="Triggers: push main/develop · pull_request main"
+          style="text;html=1;fontSize=9;fontStyle=2;fillColor=none;strokeColor=none;fontColor=#5D6D7E;"
+          vertex="1" parent="1">
+          <mxGeometry x="1626" y="462" width="820" height="16" as="geometry"/>
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             ZONA 6 — TESTES
+        ═══════════════════════════════════════════════════════════════════ -->
+        <mxCell id="z_tst" value=""
+          style="rounded=1;arcSize=2;fillColor=#FEF9E7;strokeColor=#D4AC0D;strokeWidth=2;opacity=70;"
+          vertex="1" parent="1">
+          <mxGeometry x="1612" y="492" width="846" height="410" as="geometry"/>
+        </mxCell>
+        <mxCell id="z_tst_hdr" value="TESTES - pytest · 72 testes (41 unit + 31 integration) + 69 data tests dbt"
+          style="text;html=1;fontSize=13;fontStyle=1;fillColor=none;strokeColor=none;fontColor=#7E5109;"
+          vertex="1" parent="1">
+          <mxGeometry x="1626" y="496" width="600" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- test_dag_integrity -->
+        <mxCell id="c_tdag" value="&lt;b&gt;test_dag_integrity.py&lt;/b&gt;&lt;br/&gt;18 testes unitários&lt;br/&gt;─────────────────&lt;br/&gt;· import sem erros&lt;br/&gt;· catchup=False&lt;br/&gt;· max_active_runs=1&lt;br/&gt;· tags presentes&lt;br/&gt;· schedule diário + timezone&lt;br/&gt;· execution_timeout + retry_delay&lt;br/&gt;· retries/callbacks em todas as tasks&lt;br/&gt;· task IDs esperados&lt;br/&gt;· topologia: sensor → root&lt;br/&gt;· EL paralelos&lt;br/&gt;· validate_raw após EL&lt;br/&gt;· dbt_run após validate&lt;br/&gt;· dbt_test é leaf"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D4AC0D;fontSize=9;
+                 fontColor=#7E5109;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;strokeWidth=1.5;"
+          vertex="1" parent="1">
+          <mxGeometry x="1628" y="526" width="250" height="360" as="geometry"/>
+        </mxCell>
+
+        <!-- test_resilience -->
+        <mxCell id="c_tres" value="&lt;b&gt;test_resilience.py&lt;/b&gt;&lt;br/&gt;10 testes unitários&lt;br/&gt;─────────────────&lt;br/&gt;· FileSensor soft_fail=False&lt;br/&gt;· mode=reschedule&lt;br/&gt;· timeout &gt; 0&lt;br/&gt;· poke False quando ausente&lt;br/&gt;· poke True quando presente&lt;br/&gt;· callback loga dag_id/task_id&lt;br/&gt;· callback loga exception&lt;br/&gt;· retry_exponential_backoff&lt;br/&gt;· retry_delay configurado&lt;br/&gt;· validate_raw é gate pré-dbt"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D4AC0D;fontSize=9;
+                 fontColor=#7E5109;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;strokeWidth=1.5;"
+          vertex="1" parent="1">
+          <mxGeometry x="1896" y="526" width="250" height="360" as="geometry"/>
+        </mxCell>
+
+        <!-- test_idempotency (unit) -->
+        <mxCell id="c_tidem" value="&lt;b&gt;test_idempotency.py&lt;/b&gt;&lt;br/&gt;6 unit + 2 integration&lt;br/&gt;─────────────────&lt;br/&gt;Unit: YAML parse&lt;br/&gt;· FULL_TABLE replication&lt;br/&gt;· activate_version=false&lt;br/&gt;· add_record_metadata=false&lt;br/&gt;· jobs el-sql/el-csv definidos&lt;br/&gt;· tap seleciona 6 tabelas&lt;br/&gt;· target schema = raw&lt;br/&gt;&lt;br/&gt;Integration (requer DB):&lt;br/&gt;· counts == expected&lt;br/&gt;· sem PKs duplicadas"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF8E1;strokeColor=#D4AC0D;fontSize=9;
+                 fontColor=#7E5109;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;strokeWidth=1.5;dashed=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="1628" y="528" width="250" height="180" as="geometry"/>
+        </mxCell>
+
+        <!-- test_row_counts (integration) -->
+        <mxCell id="c_trow" value="&lt;b&gt;test_row_counts.py&lt;/b&gt;&lt;br/&gt;20 testes de integração&lt;br/&gt;─────────────────&lt;br/&gt;Requer Docker Compose&lt;br/&gt;(source-postgres + dw-postgres)&lt;br/&gt;&lt;br/&gt;· contagem source == raw&lt;br/&gt;· 6 tabelas SQL comparadas&lt;br/&gt;· transacoes.csv vs raw&lt;br/&gt;· PKs não nulas&lt;br/&gt;· FK colaborador_agencia&lt;br/&gt;· valor_transacao não nulo&lt;br/&gt;&lt;br/&gt;make test-integration"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF8E1;strokeColor=#D4AC0D;fontSize=9;
+                 fontColor=#7E5109;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;strokeWidth=1.5;dashed=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="1896" y="528" width="250" height="260" as="geometry"/>
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             ZONA 7 — INFRAESTRUTURA
+        ═══════════════════════════════════════════════════════════════════ -->
+        <mxCell id="z_inf" value=""
+          style="rounded=1;arcSize=2;fillColor=#EAECEE;strokeColor=#566573;strokeWidth=2;opacity=70;"
+          vertex="1" parent="1">
+          <mxGeometry x="1612" y="918" width="846" height="494" as="geometry"/>
+        </mxCell>
+        <mxCell id="z_inf_hdr" value="INFRAESTRUTURA"
+          style="text;html=1;fontSize=13;fontStyle=1;fillColor=none;strokeColor=none;fontColor=#2C3E50;"
+          vertex="1" parent="1">
+          <mxGeometry x="1626" y="922" width="280" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- Docker Compose -->
+        <mxCell id="c_dc" value="&lt;b&gt;Docker Compose (dev)&lt;/b&gt;&lt;br/&gt;7 serviços:&lt;br/&gt;─────────────────&lt;br/&gt;source-postgres :5432&lt;br/&gt;dw-postgres :5433&lt;br/&gt;airflow-db :5434&lt;br/&gt;airflow-init (setup)&lt;br/&gt;airflow-scheduler&lt;br/&gt;airflow-webserver :8080&lt;br/&gt;metabase :3000&lt;br/&gt;dbt (container de exec.)&lt;br/&gt;&lt;br/&gt;make up · make down&lt;br/&gt;docker/airflow.Dockerfile"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#566573;fontSize=9;
+                 fontColor=#2C3E50;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;strokeWidth=1.5;"
+          vertex="1" parent="1">
+          <mxGeometry x="1628" y="952" width="380" height="300" as="geometry"/>
+        </mxCell>
+
+        <!-- Kind/K8s -->
+        <mxCell id="c_k8s" value="&lt;b&gt;Kubernetes / Kind (prod)&lt;/b&gt;&lt;br/&gt;─────────────────&lt;br/&gt;Namespace: banvic&lt;br/&gt;&lt;br/&gt;kind-cluster.yaml&lt;br/&gt;k8s/postgres/ (manifests)&lt;br/&gt;k8s/airflow/values.yaml (Helm)&lt;br/&gt;k8s/metabase/ (manifests)&lt;br/&gt;k8s/secrets.yaml (gitignored)&lt;br/&gt;&lt;br/&gt;make kind-up · make kind-load&lt;br/&gt;make kind-deploy&lt;br/&gt;helm upgrade --install airflow..."
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#566573;fontSize=9;
+                 fontColor=#2C3E50;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;strokeWidth=1.5;"
+          vertex="1" parent="1">
+          <mxGeometry x="2040" y="952" width="400" height="300" as="geometry"/>
+        </mxCell>
+
+        <!-- Segurança -->
+        <mxCell id="c_sec" value="&lt;b&gt;Segurança&lt;/b&gt;&lt;br/&gt;─────────────────&lt;br/&gt;.env (dev, gitignored)&lt;br/&gt;Kubernetes Secrets (prod)&lt;br/&gt;AIRFLOW_CONN_* via env vars&lt;br/&gt;Fernet Key gerada localmente&lt;br/&gt;Sem credenciais em código"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#566573;fontSize=9;
+                 fontColor=#2C3E50;align=left;spacingLeft=8;verticalAlign=top;spacingTop=6;strokeWidth=1.5;"
+          vertex="1" parent="1">
+          <mxGeometry x="1628" y="1268" width="810" height="124" as="geometry"/>
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             SETA: FileSensor detecta Landing Zone
+        ═══════════════════════════════════════════════════════════════════ -->
+        <mxCell id="a_lz_fs" value="arquivo detectado"
+          style="endArrow=block;endFill=1;strokeColor=#2E86C1;strokeWidth=2;fontSize=9;
+                 fontColor=#1A5276;exitX=0.3;exitY=1;entryX=0.5;entryY=0;"
+          edge="1" source="c_lz" target="c_fs" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             IDEMPOTÊNCIA — nota de rodapé
+        ═══════════════════════════════════════════════════════════════════ -->
+        <mxCell id="c_idem_note" value="Idempotência: 3 camadas — (1) Meltano FULL_TABLE recria raw.* · (2) dbt table = DROP+CREATE marts.* · (3) max_active_runs=1 previne execuções concorrentes"
+          style="text;html=1;fontSize=9;fontStyle=2;fillColor=#F4F6F7;strokeColor=#BDC3C7;
+                 align=center;fontColor=#5D6D7E;rounded=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="20" y="1432" width="1570" height="28" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

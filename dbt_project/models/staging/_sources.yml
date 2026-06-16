@@ -1,0 +1,14 @@
+version: 2
+
+sources:
+  - name: raw
+    database: analytics_dw
+    schema: raw
+    tables:
+      - name: agencias
+      - name: clientes
+      - name: colaboradores
+      - name: colaborador_agencia
+      - name: contas
+      - name: propostas_credito
+      - name: transacoes

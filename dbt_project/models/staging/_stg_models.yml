@@ -1,0 +1,93 @@
+version: 2
+
+models:
+  - name: stg_agencias
+    description: "Standardized agency data from ERP source."
+    columns:
+      - name: agency_id
+        description: "Unique agency identifier."
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_clientes
+    description: "Standardized client data from CRM source."
+    columns:
+      - name: client_id
+        description: "Unique client identifier."
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_colaboradores
+    description: "Standardized employee data from HR source."
+    columns:
+      - name: employee_id
+        description: "Unique employee identifier."
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_colaborador_agencia
+    description: "Mapping table between employees and agencies (N:N)."
+    columns:
+      - name: employee_id
+        tests:
+          - not_null
+      - name: agency_id
+        tests:
+          - not_null
+
+  - name: stg_contas
+    description: "Standardized account data from ERP source."
+    columns:
+      - name: account_id
+        description: "Unique account identifier."
+        tests:
+          - unique
+          - not_null
+      - name: client_id
+        description: "May contain reference to non-existent client (cod_cliente=528 in original data). The relationships test is severity:warn - demonstrates capture of referential integrity defect by the Silver layer before data contaminates Gold."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_clientes')
+              field: client_id
+              severity: warn
+
+  - name: stg_propostas_credito
+    description: "Standardized credit proposal data from ERP source."
+    columns:
+      - name: proposal_id
+        description: "Unique proposal identifier."
+        tests:
+          - unique
+          - not_null
+      - name: client_id
+        description: "May contain reference to non-existent client (cod_cliente=528 in original data). The relationships test is severity:warn - demonstrates capture of referential integrity defect by the Silver layer before data contaminates Gold."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_clientes')
+              field: client_id
+              severity: warn
+      - name: proposal_status
+        description: "Credit proposal funnel stage."
+        tests:
+          - accepted_values:
+              values: ['Aprovada', 'Em análise', 'Enviada', 'Validação documentos']
+
+  - name: stg_transacoes
+    description: "Standardized transaction data from ERP source."
+    columns:
+      - name: transaction_id
+        description: "Unique transaction identifier."
+        tests:
+          - unique
+          - not_null
+      - name: account_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_contas')
+              field: account_id

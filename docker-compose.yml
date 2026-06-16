@@ -1,0 +1,184 @@
+x-airflow-common: &airflow-common
+  build:
+    context: .
+    dockerfile: docker/airflow.Dockerfile
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DEFAULT_TIMEZONE: America/Sao_Paulo
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: >-
+      postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@airflow-db:5432/${AIRFLOW_DB_NAME}
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+    AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY}
+    # Conexões via env (sem UI, sem código)
+    AIRFLOW_CONN_SOURCE_POSTGRES: >-
+      postgresql://${SOURCE_POSTGRES_USER}:${SOURCE_POSTGRES_PASSWORD}@source-postgres:5432/${SOURCE_POSTGRES_DB}
+    AIRFLOW_CONN_DW_POSTGRES: >-
+      postgresql://${DW_POSTGRES_USER}:${DW_POSTGRES_PASSWORD}@dw-postgres:5432/${DW_POSTGRES_DB}
+    AIRFLOW_CONN_FS_DEFAULT: "fs://:@:/?path=%2F"
+    # Meltano - taps/targets leem estas vars
+    SOURCE_POSTGRES_HOST: source-postgres
+    SOURCE_POSTGRES_PORT: "5432"
+    SOURCE_POSTGRES_USER: ${SOURCE_POSTGRES_USER}
+    SOURCE_POSTGRES_PASSWORD: ${SOURCE_POSTGRES_PASSWORD}
+    SOURCE_POSTGRES_DB: ${SOURCE_POSTGRES_DB}
+    DW_POSTGRES_HOST: dw-postgres
+    DW_POSTGRES_PORT: "5432"
+    DW_POSTGRES_USER: ${DW_POSTGRES_USER}
+    DW_POSTGRES_PASSWORD: ${DW_POSTGRES_PASSWORD}
+    DW_POSTGRES_DB: ${DW_POSTGRES_DB}
+    # dbt
+    DBT_PASSWORD: ${DW_POSTGRES_PASSWORD}
+    MELTANO_PROJECT_ROOT: /opt/airflow/meltano
+    AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD}
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./meltano:/opt/airflow/meltano
+    - ./dbt_project:/opt/airflow/dbt_project
+    - ./data/landing:/opt/airflow/data/landing
+    - ./tests:/opt/airflow/tests:ro
+    - airflow_logs:/opt/airflow/logs
+  user: "50000:0"
+  depends_on:
+    airflow-db:
+      condition: service_healthy
+
+services:
+  # -- Source Postgres (ERP simulado) --------------------------
+  source-postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${SOURCE_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${SOURCE_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${SOURCE_POSTGRES_DB}
+    volumes:
+      - ./postgres/source-init:/docker-entrypoint-initdb.d:ro
+      - ./data/source:/data:ro
+      - source_pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SOURCE_POSTGRES_USER} -d ${SOURCE_POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  # -- DW Postgres (analytics_dw + metabase_app) ---------------
+  dw-postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${DW_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${DW_POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+    volumes:
+      - ./postgres/dw-init:/docker-entrypoint-initdb.d:ro
+      - dw_pg_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DW_POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  # -- Airflow metadata DB --------------------------------------
+  airflow-db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${AIRFLOW_DB_USER}
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD}
+      POSTGRES_DB: ${AIRFLOW_DB_NAME}
+    volumes:
+      - airflow_pg_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AIRFLOW_DB_USER} -d ${AIRFLOW_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # -- Airflow Init (cria DB + usuário admin) -------------------
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate
+        airflow users create \
+          --role Admin \
+          --username admin \
+          --password "$$AIRFLOW_ADMIN_PASSWORD" \
+          --email admin@banvic.local \
+          --firstname Admin \
+          --lastname User
+    restart: on-failure
+
+  # -- Airflow Webserver ----------------------------------------
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # -- Airflow Scheduler ----------------------------------------
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+  # -- dbt (container de transformação, acessível via exec) -----
+  dbt:
+    image: ghcr.io/dbt-labs/dbt-postgres:1.9.latest
+    platform: linux/amd64
+    depends_on:
+      dw-postgres:
+        condition: service_healthy
+    working_dir: /usr/app/dbt
+    volumes:
+      - ./dbt_project:/usr/app/dbt
+    environment:
+      DBT_PROFILES_DIR: /usr/app/dbt
+      DBT_PASSWORD: ${DW_POSTGRES_PASSWORD}
+    entrypoint: ["sleep", "infinity"]
+
+  # -- Metabase (BI) --------------------------------------------
+  metabase:
+    image: metabase/metabase:v0.50.31
+    platform: linux/amd64
+    depends_on:
+      dw-postgres:
+        condition: service_healthy
+    environment:
+      MB_DB_TYPE: ${MB_DB_TYPE}
+      MB_DB_DBNAME: ${MB_DB_DBNAME}
+      MB_DB_HOST: dw-postgres
+      MB_DB_PORT: "5432"
+      MB_DB_USER: ${DW_POSTGRES_USER}
+      MB_DB_PASS: ${DW_POSTGRES_PASSWORD}
+    volumes:
+      - metabase_data:/metabase-data
+    ports:
+      - "3000:3000"
+
+volumes:
+  source_pg_data:
+  dw_pg_data:
+  airflow_pg_data:
+  airflow_logs:
+  metabase_data:

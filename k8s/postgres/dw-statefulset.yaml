@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: dw-postgres
+  namespace: banvic
+spec:
+  selector:
+    matchLabels:
+      app: dw-postgres
+  serviceName: dw-postgres
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: dw-postgres
+    spec:
+      initContainers:
+      - name: init-scripts
+        image: postgres:16
+        command:
+        - /bin/bash
+        - -c
+        - |
+          cp /init-scripts/* /docker-entrypoint-initdb.d/
+        volumeMounts:
+        - name: init-scripts
+          mountPath: /init-scripts
+        - name: initdb
+          mountPath: /docker-entrypoint-initdb.d
+      containers:
+      - name: postgres
+        image: postgres:16
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: banvic-secrets
+              key: DW_POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: banvic-secrets
+              key: DW_POSTGRES_PASSWORD
+        - name: POSTGRES_DB
+          value: postgres
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+        - name: initdb
+          mountPath: /docker-entrypoint-initdb.d
+        readinessProbe:
+          exec:
+            command: ["pg_isready", "-U", "analytics"]
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: init-scripts
+        configMap:
+          name: dw-init-scripts
+      - name: initdb
+        emptyDir: {}
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dw-postgres
+  namespace: banvic
+spec:
+  selector:
+    app: dw-postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+  clusterIP: None

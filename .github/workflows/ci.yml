@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # -- Job 1: Lint ----------------------------------------------------
+  lint:
+    name: Lint (ruff + yamllint + sqlfluff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install linters
+        run: pip install ruff==0.4.* yamllint==1.35.* sqlfluff==4.2.*
+
+      - name: ruff - DAGs e testes
+        run: ruff check dags/ tests/
+
+      - name: yamllint - meltano + docker-compose
+        run: yamllint -c .yamllint meltano/meltano.yml docker-compose.yml
+
+      - name: sqlfluff - modelos dbt
+        run: sqlfluff lint dbt_project/models
+
+  # -- Job 2: testes unitários (DAG, resiliência, config, cobertura) --
+  dag-tests:
+    name: Testes unitários (sem DB)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Airflow e dependências de teste
+        run: |
+          pip install \
+            "apache-airflow==2.9.2" \
+            "apache-airflow-providers-postgres>=5.0.0" \
+            "apache-airflow-providers-common-io>=1.0.0" \
+            pytest \
+            psycopg2-binary \
+            pyyaml \
+            --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.9.2/constraints-3.12.txt"
+
+      - name: pytest - testes unitários (toda a suíte, exceto integração)
+        run: pytest tests/ -m "not integration" -v
+
+  # -- Job 3: dbt parse (verifica compilação sem executar SQL) ---------
+  dbt-parse:
+    name: dbt parse
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dbt-postgres
+        run: pip install "dbt-postgres==1.9.*"
+
+      - name: dbt deps
+        working-directory: dbt_project
+        env:
+          DBT_PASSWORD: ci_placeholder
+        run: dbt deps --profiles-dir . --project-dir .
+
+      - name: dbt parse
+        working-directory: dbt_project
+        env:
+          DBT_PASSWORD: ci_placeholder
+          DW_POSTGRES_HOST: localhost
+          DW_POSTGRES_USER: analytics
+        run: dbt parse --profiles-dir . --project-dir .
+
+  # -- Job 4: Meltano config (validação estática) ----------------------
+  meltano-config:
+    name: Meltano config validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pyyaml
+        run: pip install pyyaml
+
+      - name: Verificar estrutura meltano.yml
+        run: |
+          python - <<'EOF'
+          import yaml, sys
+          from pathlib import Path
+
+          cfg = yaml.safe_load(Path("meltano/meltano.yml").read_text())
+
+          # Valida extractors
+          extractors = {e["name"] for e in cfg["plugins"]["extractors"]}
+          assert "tap-postgres" in extractors, "tap-postgres não encontrado"
+          assert "tap-csv" in extractors, "tap-csv não encontrado"
+
+          # Valida loader
+          loaders = {l["name"]: l for l in cfg["plugins"]["loaders"]}
+          assert "target-postgres" in loaders, "target-postgres não encontrado"
+          tgt = loaders["target-postgres"]["config"]
+          assert tgt.get("activate_version") is False, "activate_version deve ser false"
+          assert tgt.get("add_record_metadata") is False, "add_record_metadata deve ser false"
+
+          # Sem segredos em texto claro
+          content = Path("meltano/meltano.yml").read_text()
+          for secret_pattern in ["password", "secret", "token"]:
+              lines = [l for l in content.splitlines() if secret_pattern in l.lower() and not l.strip().startswith("#")]
+              for line in lines:
+                  assert "$" in line, f"Possível segredo em texto claro: {line.strip()}"
+
+          # Jobs definidos
+          jobs = {j["name"] for j in cfg.get("jobs", [])}
+          assert "el-sql" in jobs and "el-csv" in jobs, f"Jobs esperados ausentes: {jobs}"
+
+          print("OK: meltano.yml válido")
+          EOF

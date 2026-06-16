@@ -1,0 +1,31 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: banvic
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        node-labels: "ingress-ready=true"
+  extraPortMappings:
+  - containerPort: 30080   # Airflow webserver
+    hostPort: 8080
+    protocol: TCP
+  - containerPort: 30300   # Metabase
+    hostPort: 3000
+    protocol: TCP
+  - containerPort: 30532   # source-postgres (opcional para debug)
+    hostPort: 5432
+    protocol: TCP
+  - containerPort: 30533   # dw-postgres (opcional para debug)
+    hostPort: 5433
+    protocol: TCP
+  # Monta data/source e data/landing do host no nó Kind para seed do ERP e landing zone do CSV.
+  # `make kind-up` deve ser executado a partir da raiz do projeto com os CSVs já em data/source/ e data/landing/.
+  extraMounts:
+  - hostPath: ./data/source
+    containerPath: /mnt/source-data
+  - hostPath: ./data/landing
+    containerPath: /mnt/landing-data

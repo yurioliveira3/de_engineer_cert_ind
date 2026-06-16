@@ -1,0 +1,83 @@
+# --- Dados (gitignored - obter do Drive / README) ---
+# Usa `/*` + `!.gitkeep` para rastrear a estrutura de pastas sem os CSVs
+data/source/*
+!data/source/.gitkeep
+data/landing/*
+!data/landing/.gitkeep
+data/analytics_data/*
+!data/analytics_data/.gitkeep
+banvic_data/
+
+# --- Artefatos dbt ---
+dbt_project/target/
+dbt_project/dbt_packages/
+dbt_project/logs/
+dbt_project/package-lock.yml
+dbt_project/.user.yml
+
+# --- Meltano ---
+meltano/.meltano/
+meltano/output/
+meltano/.env
+
+# --- Docker volumes ---
+postgres_data/
+metabase_data/
+metabase.db/
+
+# --- Airflow (logs e artefatos gerados) ---
+logs/
+airflow/logs/
+airflow.cfg
+webserver_config.py
+standalone_admin_password.txt
+
+# --- Kubernetes (segredos) ---
+k8s/secrets.yaml
+
+# --- Helm charts baixados localmente ---
+*.tgz
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+.ipynb_checkpoints/
+
+# --- Ambiente e sistema ---
+.env
+.env.local
+.env.*.local
+.DS_Store
+*.swp
+*.swo
+*~
+
+# --- IDEs ---
+.idea/
+.vscode/
+
+# --- Arquivos binários do case (não versionar) ---
+*.docx
+
+# --- Pacote de entrega (montado fora do código versionado) ---
+CEA_AW_*/
+*.rar
+*.zip
+
+# --- LLM Configs ---
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+
+agents/
+AGENTS.md
+AGENTS.local.md

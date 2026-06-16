@@ -1,0 +1,71 @@
+version: 1
+default_environment: dev
+project_id: banvic-elt-pipeline
+
+environments:
+- name: dev
+
+plugins:
+  extractors:
+  - name: tap-postgres
+    namespace: tap_postgres
+    pip_url: meltanolabs-tap-postgres
+    executable: tap-postgres
+    capabilities:
+    - state
+    - catalog
+    - discover
+    - properties
+    config:
+      host: $SOURCE_POSTGRES_HOST
+      port: 5432
+      user: $SOURCE_POSTGRES_USER
+      password: $SOURCE_POSTGRES_PASSWORD
+      database: $SOURCE_POSTGRES_DB
+      default_replication_method: FULL_TABLE
+      filter_schemas:
+      - public
+    select:
+    - public-agencias.*
+    - public-clientes.*
+    - public-colaboradores.*
+    - public-colaborador_agencia.*
+    - public-contas.*
+    - public-propostas_credito.*
+
+  - name: tap-csv
+    namespace: tap_csv
+    pip_url: git+https://github.com/MeltanoLabs/tap-csv.git
+    executable: tap-csv
+    capabilities:
+    - state
+    - catalog
+    - discover
+    config:
+      csv_files_definition: extract/csv_files.json
+
+  loaders:
+  - name: target-postgres
+    namespace: target_postgres
+    pip_url: meltanolabs-target-postgres
+    executable: target-postgres
+    capabilities:
+    - about
+    config:
+      host: $DW_POSTGRES_HOST
+      port: 5432
+      user: $DW_POSTGRES_USER
+      password: $DW_POSTGRES_PASSWORD
+      database: $DW_POSTGRES_DB
+      default_target_schema: raw
+      add_record_metadata: false
+      activate_version: false
+
+jobs:
+- name: el-sql
+  tasks:
+  - tap-postgres target-postgres
+
+- name: el-csv
+  tasks:
+  - tap-csv target-postgres

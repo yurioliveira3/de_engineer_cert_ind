@@ -1,0 +1,8 @@
+[
+  {
+    "entity": "transacoes",
+    "path": "/opt/airflow/data/landing/transacoes.csv",
+    "keys": ["cod_transacao"],
+    "delimiter": ","
+  }
+]
