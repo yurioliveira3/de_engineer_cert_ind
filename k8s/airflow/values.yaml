@@ -91,7 +91,9 @@ dags:
 
 logs:
   persistence:
-    enabled: false
+    enabled: true
+    size: 1Gi
+    storageClassName: ""
 
 extraVolumes:
 - name: landing-zone
@@ -232,8 +234,9 @@ podTemplate: |
     terminationGracePeriodSeconds: 600
     serviceAccountName: airflow-worker
     volumes:
-      - emptyDir: {}
-        name: logs
+      - name: logs
+        persistentVolumeClaim:
+          claimName: airflow-logs
       - configMap:
           name: airflow-config
         name: config

@@ -131,10 +131,14 @@ docker compose exec dw-postgres psql -U analytics -d analytics_dw \
 > Os 31 de integração rodam contra o banco real via `make test-integration`."
 
 ```bash
-# testes unitários (sem banco, rápidos)
+# testes unitários (sem banco, rápidos) — com Docker Compose no ar
 docker compose exec airflow-scheduler \
   /home/airflow/tool-venv/bin/python -m pytest tests/ -m "not integration" -q
 ```
+
+> **Se estiver gravando com Kind no ar** (sem Docker Compose): copie os arquivos de
+> teste para o pod do scheduler e rode via `kubectl exec`. Veja o bloco "Rodando com
+> Kubernetes / Kind" na seção Testes do `README.md`.
 
 > "Além desses, o dbt executa mais 69 data tests na etapa `dbt_test` — dois deles falham
 > intencionalmente, capturando uma inconsistência real de integridade referencial no dado
@@ -166,8 +170,18 @@ kubectl get pods -n banvic
 
 ## Checklist antes de gravar
 
+**Docker Compose**
 - [ ] `make up` rodado, todos os containers `healthy` (`docker compose ps`)
 - [ ] DAG `banvic_elt` com pelo menos uma execução verde no histórico
+- [ ] Logs da task `validate_raw_load` visíveis na UI do Airflow (confirma que os dados chegaram)
+
+**Kubernetes / Kind** (alternativa)
+- [ ] Cluster Kind no ar (`kubectl get pods -n banvic` todos `Running`)
+- [ ] DAG `banvic_elt` executada e verde no histórico (`make kind-admin-password` feito)
+- [ ] Logs da task `validate_raw_load` visíveis na UI — requer `logs.persistence` configurado via `make kind-upgrade` (ver `CLAUDE.md`)
+- [ ] Testes rodando: `make kind-test` → `41 passed`
+
+**Geral**
 - [ ] Metabase configurado e com um dashboard básico visível (opcional)
 - [ ] Terminal com fonte legível (mínimo 16pt), fundo escuro
 - [ ] Janela do Airflow em 100% de zoom para legibilidade

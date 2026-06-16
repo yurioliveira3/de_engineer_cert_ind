@@ -288,7 +288,7 @@ A suíte tem **72 testes pytest** divididos em duas categorias:
 | Integração | 31 | `integration` | `make up` + DAG executada ao menos 1× |
 
 ```bash
-# Testes unitários (via Makefile — roda dentro do container)
+# Testes unitários (via Makefile — roda dentro do container Docker Compose)
 make test
 
 # Testes de integração
@@ -299,6 +299,34 @@ docker compose exec airflow-scheduler \
   /home/airflow/tool-venv/bin/python -m pytest \
   tests/dags/test_dag_integrity.py -k test_topology_el_tasks_are_parallel -v
 ```
+
+**Rodando com Kubernetes / Kind** (quando o Docker Compose não está no ar):
+
+```bash
+# 1. Captura o nome do pod do scheduler automaticamente
+POD=$(kubectl get pod -n banvic -l component=scheduler -o jsonpath='{.items[0].metadata.name}')
+
+# 2. Limpa execuções anteriores (evita cópia aninhada se /tmp/tests já existir)
+kubectl exec -n banvic $POD -c scheduler -- \
+  rm -rf /tmp/tests /tmp/dbt_project /tmp/meltano /tmp/pyproject.toml
+
+# 3. Copia os arquivos de teste para o pod (tests/ não está na imagem bakeada)
+kubectl cp tests/        banvic/$POD:/tmp/tests        -c scheduler
+kubectl cp dbt_project/  banvic/$POD:/tmp/dbt_project  -c scheduler
+kubectl cp meltano/      banvic/$POD:/tmp/meltano      -c scheduler
+kubectl cp pyproject.toml banvic/$POD:/tmp/pyproject.toml -c scheduler
+
+# 4. Instala o pytest no tool-venv do pod e executa
+kubectl exec -n banvic $POD -c scheduler -- \
+  /home/airflow/tool-venv/bin/pip install pytest pyyaml -q
+
+kubectl exec -n banvic $POD -c scheduler -- \
+  bash -c "cd /tmp && PYTHONPATH=/home/airflow/.local/lib/python3.12/site-packages \
+  /home/airflow/tool-venv/bin/python -m pytest tests/ -m 'not integration' -v 2>&1"
+```
+
+> `tests/` não é bakeado na imagem Kind (apenas `dags/`, `meltano/` e `dbt_project/` são)
+> porque testes são artefatos de dev/CI — o `kubectl cp` acima supre isso sem alterar a imagem.
 
 Os 41 testes unitários cobrem topologia e configuração da DAG (18 testes), resiliência
 a falhas e retries (10 testes), governança dos modelos dbt (7 testes) e comportamento
@@ -554,7 +582,9 @@ make fix-sql           # sqlfluff fix (auto-corrige estilo SQL)
 # Kubernetes / Kind
 make kind-up           # cria cluster Kind
 make kind-load         # build da imagem + carrega no Kind
-make kind-deploy       # aplica namespace, secrets, postgres, airflow-db, metabase
+make kind-deploy       # aplica namespace, secrets, postgres, airflow-db, metabase + PV de logs
+make kind-upgrade      # aplica mudanças do values.yaml sem recriar o cluster
+make kind-test         # 41 testes unitários no pod do scheduler Kind
 make kind-down         # destrói o cluster
 ```
 
@@ -601,7 +631,8 @@ make kind-down         # destrói o cluster
 │   ├── postgres/                      # StatefulSets (source-pg, dw-pg) + ConfigMaps + initContainers
 │   ├── airflow/
 │   │   ├── airflow-db-statefulset.yaml
-│   │   └── values.yaml               # Helm values (KubernetesExecutor, secrets, NodePort, extraMounts)
+│   │   ├── logs-pv.yaml              # PersistentVolume hostPath para logs (RWX, /tmp/airflow-logs no nó Kind)
+│   │   └── values.yaml               # Helm values (KubernetesExecutor, secrets, NodePort, logs persistence)
 │   └── metabase/deployment.yaml
 ├── docker/
 │   └── airflow.Dockerfile             # Airflow 2.9.2 + Meltano + dbt em /home/airflow/tool-venv

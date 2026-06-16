@@ -1,6 +1,6 @@
 .PHONY: help up down build seed logs-airflow meltano-install start \
-        kind-up kind-load kind-deploy kind-down kind-start \
-        kind-secrets kind-admin-password \
+        kind-up kind-load kind-deploy kind-down kind-start kind-upgrade \
+        kind-secrets kind-admin-password kind-test \
         dbt-run dbt-test lint lint-sql fix-sql test test-integration
 
 COMPOSE = docker compose
@@ -29,6 +29,8 @@ help:
 	@echo "  make kind-secrets        gera k8s/secrets.yaml a partir do .env"
 	@echo "  make kind-deploy         aplica os manifests + instala Airflow via Helm"
 	@echo "  make kind-admin-password cria o usuário admin com a senha do .env"
+	@echo "  make kind-upgrade        aplica mudanças do values.yaml via helm upgrade"
+	@echo "  make kind-test           41 testes unitários no pod do scheduler Kind"
 	@echo "  make kind-down           destrói o cluster Kind"
 	@echo ""
 	@echo "Transformação / Testes:"
@@ -111,6 +113,20 @@ test-integration:
 	@$(COMPOSE) exec airflow-scheduler /home/airflow/tool-venv/bin/pip install pytest pyyaml psycopg2-binary -q
 	$(AIRFLOW_PYTEST) -m integration -v
 
+kind-test:
+	@POD=$$(kubectl get pod -n banvic -l component=scheduler -o jsonpath='{.items[0].metadata.name}') && \
+	echo "Copiando arquivos de teste para $$POD..." && \
+	kubectl exec -n banvic $$POD -c scheduler -- rm -rf /tmp/tests /tmp/dbt_project /tmp/meltano /tmp/pyproject.toml && \
+	kubectl cp tests/         banvic/$$POD:/tmp/tests         -c scheduler && \
+	kubectl cp dbt_project/   banvic/$$POD:/tmp/dbt_project   -c scheduler && \
+	kubectl cp meltano/       banvic/$$POD:/tmp/meltano       -c scheduler && \
+	kubectl cp pyproject.toml banvic/$$POD:/tmp/pyproject.toml -c scheduler && \
+	kubectl exec -n banvic $$POD -c scheduler -- \
+		/home/airflow/tool-venv/bin/pip install pytest pyyaml -q && \
+	kubectl exec -n banvic $$POD -c scheduler -- \
+		bash -c "cd /tmp && PYTHONPATH=/home/airflow/.local/lib/python3.12/site-packages \
+		/home/airflow/tool-venv/bin/python -m pytest tests/ -m 'not integration' -v"
+
 # ---------- Kind (Kubernetes local) ----------
 
 kind-admin-password:
@@ -148,6 +164,11 @@ kind-deploy:
 	kubectl apply -f k8s/postgres/ -n banvic
 	kubectl apply -f k8s/airflow/airflow-db-statefulset.yaml -n banvic
 	kubectl apply -f k8s/metabase/ -n banvic
+	@echo "Criando PV de logs e corrigindo permissões no nó Kind..."
+	docker exec $(KIND_CLUSTER)-control-plane mkdir -p /tmp/airflow-logs
+	docker exec $(KIND_CLUSTER)-control-plane chown -R 50000:0 /tmp/airflow-logs
+	docker exec $(KIND_CLUSTER)-control-plane chmod -R 775 /tmp/airflow-logs
+	kubectl apply -f k8s/airflow/logs-pv.yaml
 	@echo "Baixando chart do Airflow 1.13.0..."
 	curl -sSL -o /tmp/airflow-1.13.0.tgz \
 		https://github.com/apache/airflow/releases/download/helm-chart%2F1.13.0/airflow-1.13.0.tgz
@@ -155,6 +176,19 @@ kind-deploy:
 	rm -f /tmp/airflow-1.13.0.tgz
 	@echo "OK: deploy concluído — namespace, secrets, postgres, airflow-db, metabase e Airflow aplicados."
 	@echo "    Aguarde os pods ficarem 1/1 Running: kubectl get pods -n banvic -w"
+
+kind-upgrade:
+	@echo "Garantindo PV de logs e permissões no nó Kind..."
+	docker exec $(KIND_CLUSTER)-control-plane mkdir -p /tmp/airflow-logs
+	docker exec $(KIND_CLUSTER)-control-plane chown -R 50000:0 /tmp/airflow-logs
+	docker exec $(KIND_CLUSTER)-control-plane chmod -R 775 /tmp/airflow-logs
+	kubectl apply -f k8s/airflow/logs-pv.yaml
+	@echo "Baixando chart do Airflow 1.13.0..."
+	curl -sSL -o /tmp/airflow-1.13.0.tgz \
+		https://github.com/apache/airflow/releases/download/helm-chart%2F1.13.0/airflow-1.13.0.tgz
+	helm upgrade airflow /tmp/airflow-1.13.0.tgz -n banvic -f k8s/airflow/values.yaml
+	rm -f /tmp/airflow-1.13.0.tgz
+	@echo "OK: Airflow atualizado. Aguarde os pods reiniciarem: kubectl get pods -n banvic -w"
 
 kind-down:
 	kind delete cluster --name $(KIND_CLUSTER)
