@@ -14,37 +14,54 @@ Pipeline de dados completo para o case **BanVic (Banco Vitória S.A.)**, desenvo
 
 ## Arquitetura
 
-```
-  banvic_data/ (7 CSVs)                ┌───── Kubernetes (Kind) / Docker Compose ─────┐
-  (ERP simulado)                        │                                               │
-       │                               │  ┌──────────────┐      ┌──────────────────┐  │
-       ├─ 6 tabelas ──────────────────►│  │Source Postgres│      │     Airflow       │  │
-       │  agencias, clientes,           │  │  (ERP sim.)   │      │ webserver+sched.  │  │
-       │  colaboradores,                │  │  6 tabelas    │      │  DAG: banvic_elt  │  │
-       │  colaborador_agencia,          │  └──────┬────────┘      └────────┬─────────┘  │
-       │  contas, propostas_credito     │         │ tap-postgres            │ orquestra  │
-       │                               │         ▼                         ▼            │
-       └─ transacoes.csv ─────────────►│   ┌─────────────┐    FileSensor → EL → T       │
-          (landing zone)               │   │   Meltano   │ ◄── (retries + idempotência) │
-                                       │   │ tap-postgres│                               │
-                                       │   │ tap-csv     │                               │
-                                       │   │→ target-pg  │                               │
-                                       │   └──────┬──────┘                               │
-                                       │          │ FULL_TABLE → raw.*                   │
-                                       │          ▼                                      │
-                                       │  ┌───────────────┐  ┌──────────┐  ┌──────────┐ │
-                                       │  │  DW Postgres   │  │ dbt Core │  │ Metabase │ │
-                                       │  │ raw (bronze)   │─►│ staging  │─►│dashboard │ │
-                                       │  │                │  │ marts    │  │          │ │
-                                       │  └───────────────┘  └──────────┘  └──────────┘ │
-                                       │  Segredos: .env (dev) · Kubernetes Secrets (k8s)│
-                                       └──────────────────────────────────────────────────┘
+```mermaid
+%%{init: {'theme': 'neutral'}}%%
+flowchart LR
+    subgraph Sources["Fontes de Dados"]
+        direction TB
+        ERP["6 CSVs do ERP\nagencias · clientes · colaboradores\ncolaborador_agencia · contas · propostas_credito"]
+        TRX["transacoes.csv\nlanding zone"]
+    end
+
+    subgraph Platform["Kubernetes Kind  /  Docker Compose"]
+        SP[("source-postgres\n6 tabelas ERP")]
+
+        subgraph DAG["Apache Airflow · DAG banvic_elt"]
+            direction TB
+            FS["FileSensor\nwait_transacoes_csv"]
+            subgraph EL["Meltano — Extract & Load paralelo"]
+                ELSQL["el-sql\ntap-postgres"]
+                ELCSV["el-csv\ntap-csv"]
+            end
+            VAL["validate_raw_load\ngate · COUNT > 0 nas 7 tabelas"]
+            DBT["dbt Core\ndbt run + dbt test"]
+        end
+
+        subgraph DW["DW Postgres · analytics_dw"]
+            direction TB
+            RAW[("raw.*\nBronze")]
+            STG[("staging.*\nSilver")]
+            MARTS[("marts.*\nGold")]
+        end
+
+        MB["Metabase\nBI Dashboard"]
+    end
+
+    ERP -->|"init SQL"| SP
+    SP -->|"FULL_TABLE"| ELSQL
+    TRX --> FS
+    TRX --> ELCSV
+    FS -->|"arquivo presente"| ELSQL & ELCSV
+    ELSQL & ELCSV -->|"target-postgres"| RAW
+    ELSQL & ELCSV --> VAL
+    VAL -->|"gate OK"| DBT
+    RAW --> DBT
+    DBT -->|"views"| STG
+    DBT -->|"tables DROP+CREATE"| MARTS
+    MARTS --> MB
 ```
 
-O diagrama acima mostra a topologia do pipeline: à esquerda, os dois sistemas de origem (source-postgres com o ERP bancário e o arquivo `transacoes.csv` na landing zone); ao centro, o Airflow orquestrando o Meltano como motor de extração e carga; à direita, as três camadas do Data Warehouse — raw, staging e marts — consumidas pelo Metabase. Em produção, toda a stack sobe em um cluster Kind com StatefulSets, PVCs e o Airflow gerenciado pelo Helm chart oficial com KubernetesExecutor.
-
-[![Arquitetura técnica BanVic ELT Pipeline](docs/screenshots/arquitetura_geral.png)](docs/screenshots/arquitetura_geral.png)
-_Arquitetura técnica exportada de `docs/architectures/arquitetura_dados.drawio`. Abra no [draw.io](https://app.diagrams.net) para navegar pelas camadas interativamente._
+A topologia segue o padrão ELT em três estágios: os dados de origem (ERP relacional + arquivo de transações) são ingeridos via Meltano com replicação `FULL_TABLE` na camada Bronze; o Airflow orquestra todo o fluxo com FileSensor, execução paralela do EL e gate de qualidade antes do dbt; e o dbt transforma Bronze → Silver (views) → Gold (tables), expondo os marts no Metabase. Em produção, a stack inteira roda em Kubernetes (Kind) com KubernetesExecutor — cada task da DAG sobe como um pod isolado.
 
 ---
 
@@ -615,7 +632,8 @@ make kind-down         # destrói o cluster
 | [`docs/reference/dicionario_dados.md`](docs/reference/dicionario_dados.md) | Catálogo Bronze/Silver/Gold/Metadata — schemas, volumes e inconsistências |
 | [`docs/operational/checklist_e2e.md`](docs/operational/checklist_e2e.md) | Roteiro E2E do zero ao dado no destino (Compose e Kind) |
 | [`docs/delivery/roteiro_video.md`](docs/delivery/roteiro_video.md) | Roteiro do vídeo 4-5 min com timestamps, narração e checklist de gravação |
-| [`docs/architectures/`](docs/architectures/) | Diagramas draw.io — modelo conceitual e arquitetura técnica |
+| [`docs/architectures/`](docs/architectures/) | Diagrama draw.io da arquitetura técnica completa |
+| [`docs/screenshots/modelo_banvic.png`](docs/screenshots/modelo_banvic.png) | Modelo conceitual ER do BanVic |
 | [`docs/screenshots/`](docs/screenshots/) | Capturas de tela do pipeline em execução (Airflow, Metabase, pytest, K8s) |
 
 > As capturas em `docs/screenshots/` são geradas após uma execução completa do pipeline.
@@ -625,9 +643,7 @@ make kind-down         # destrói o cluster
 
 ## Diagramas de Arquitetura
 
-Abrir no [draw.io](https://app.diagrams.net) — pasta `docs/architectures/`:
-
 | Arquivo | Conteúdo |
 |---|---|
-| `modelo_conceitual.drawio` | Entidades de negócio e relacionamentos (ER simplificado) |
-| `arquitetura_dados.drawio` | Stack técnica completa — Airflow, Meltano, dbt, DW, CI/CD, infra |
+| [`docs/screenshots/modelo_banvic.png`](docs/screenshots/modelo_banvic.png) | Modelo conceitual — entidades de negócio e relacionamentos (ER) |
+| [`docs/architectures/arquitetura_dados.drawio`](docs/architectures/arquitetura_dados.drawio) | Stack técnica completa — Airflow, Meltano, dbt, DW, CI/CD, infra (abrir no [draw.io](https://app.diagrams.net)) |
