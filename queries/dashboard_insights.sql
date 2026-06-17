@@ -77,3 +77,42 @@ SELECT
     agency_id
 FROM marts.mart_oportunidade_crosssell
 ORDER BY total_balance DESC;
+
+-- 6. Ranking de alavancas — qual driver move o engajamento transacional? (Sofia/CEO)
+-- Gráfico de barras horizontal no Metabase: eixo x = correlation, eixo y = driver_label.
+-- Colorir por direction (positivo=verde, negativo=vermelho).
+-- Insight esperado: nenhum driver explica mais de 1% da variância — o achado é a ausência de sinal forte.
+SELECT
+    impact_rank,
+    driver,
+    correlation,
+    direction,
+    significant_at_5pct,
+    r_squared_pct,
+    sample_size,
+    CASE
+        WHEN significant_at_5pct AND r_squared_pct >= 5 THEN 'Relevante'
+        WHEN significant_at_5pct AND r_squared_pct < 5  THEN 'Significativo mas fraco'
+        ELSE 'Sem evidência'
+    END as verdict
+FROM marts.mart_ranking_alavancas
+ORDER BY impact_rank;
+
+-- 7. Tabela de contexto estatístico — acompanha o gráfico 6 (Sofia/CEO)
+-- Exibe como tabela estática no dashboard abaixo do gráfico de barras.
+-- Rodapé recomendado: "Correlação mede associação linear. r² < 1% indica
+-- relevância prática negligenciável mesmo quando p < 0,05."
+SELECT
+    impact_rank                                              as "#",
+    driver                                                   as "Alavanca",
+    correlation                                              as "r (Pearson)",
+    r_squared_pct || '%'                                     as "r² (variância explicada)",
+    CASE WHEN significant_at_5pct THEN 'Sim' ELSE 'Não' END as "Significativo (p<0,05)?",
+    CASE
+        WHEN significant_at_5pct AND r_squared_pct >= 5 THEN 'Relevante'
+        WHEN significant_at_5pct AND r_squared_pct < 5  THEN 'Significativo mas fraco'
+        ELSE 'Sem evidência'
+    END                                                      as "Veredito",
+    sample_size                                              as "n (clientes)"
+FROM marts.mart_ranking_alavancas
+ORDER BY impact_rank;

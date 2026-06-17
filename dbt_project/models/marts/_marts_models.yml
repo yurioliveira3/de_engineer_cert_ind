@@ -189,6 +189,8 @@ models:
       - name: sample_size
         tests:
           - not_null
+      - name: r_squared_pct
+        description: "% da variância de transaction_count explicada pelo driver (r²×100). Complementa significant_at_5pct com contexto de relevância prática."
       - name: direction
         tests:
           - accepted_values:

@@ -58,6 +58,7 @@ ranked as (
         driver,
         round(correlation::numeric, 4) as correlation,
         round(abs(correlation)::numeric, 4) as abs_correlation,
+        round((correlation ^ 2 * 100)::numeric, 2) as r_squared_pct,
         case
             when correlation > 0 then 'positivo'
             when correlation < 0 then 'negativo'
@@ -66,8 +67,9 @@ ranked as (
         sample_size,
         round(t_statistic::numeric, 2) as t_statistic,
         abs(t_statistic) > 1.96 as significant_at_5pct,
-        row_number() over (order by abs(correlation) desc) as impact_rank
+        row_number() over (order by abs(correlation) desc nulls last) as impact_rank
     from stats
+    where correlation is not null
 )
 
 select * from ranked
