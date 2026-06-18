@@ -12,19 +12,20 @@ O pipeline precisa ser executado diariamente, monitorar a chegada de um arquivo 
 disparar etapas sequenciais e paralelas, e garantir reexecução em caso de falha.
 
 **Decisão**  
-Apache Airflow 2.9.2 com `LocalExecutor`.
+Apache Airflow 2.9.2 com `LocalExecutor` (Docker Compose) e `KubernetesExecutor` (Kind).
 
 **Justificativa**  
 - Exigência explícita da certificação (Airflow como orquestrador).
-- `LocalExecutor` é suficiente para um case com DAG única e volume controlado - sem overhead
-  de CeleryExecutor (Redis/MQ) ou KubernetesExecutor.
+- `LocalExecutor` é suficiente para desenvolvimento com DAG única e volume controlado.
+- `KubernetesExecutor` em produção (Kind) fornece isolamento total: cada task roda como
+  um pod separado, sem overhead de CeleryExecutor (Redis/MQ).
 - `FileSensor` nativo resolve o problema de dependência do CSV externo sem código customizado.
 - `max_active_runs=1` previne execuções concorrentes no mesmo banco sem transações distribuídas.
 
 **Trade-offs aceitos**  
-- `LocalExecutor` não escala horizontalmente. Para produção com múltiplas DAGs ou alto paralelismo,
-  `CeleryExecutor` seria preferível.
-- O arquivo `.env` injeta conexões via variável de ambiente (`AIRFLOW_CONN_*`) - uma conexão
+- `LocalExecutor` não escala horizontalmente. Em produção com múltiplas DAGs ou alto
+  paralelismo, `KubernetesExecutor` (já configurado para Kind) seria a escolha permanente.
+- O arquivo `.env` injeta conexões via variável de ambiente (`AIRFLOW_CONN_*`) — uma conexão
   definida via UI seria mais auditável, mas introduz estado fora do versionamento.
 
 ---
@@ -174,9 +175,9 @@ Os dois tasks de EL rodam **em paralelo** e convergem no gate de validação.
   completaram com sucesso antes do dbt iniciar.
 
 **Trade-offs aceitos**  
-- `LocalExecutor` com `max_active_runs=1` limita o paralelismo real ao número de workers
-  configurados. Para este case, 1 worker é suficiente e o paralelismo é lógico,
-  não necessariamente físico.
+- Com `KubernetesExecutor` (Kind), o paralelismo é natural — cada task é um pod isolado.
+  Com `LocalExecutor` (Compose), `max_active_runs=1` limita o paralelismo ao número de
+  workers. Para este case, o paralelismo é lógico (as duas tasks EL não dependem entre si).
 
 ---
 

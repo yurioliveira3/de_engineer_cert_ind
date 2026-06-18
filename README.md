@@ -238,7 +238,7 @@ make kind-admin-password
 #    Metabase: http://localhost:3000  ← sobe em branco; siga a seção
 #                                        "Configuração inicial do Metabase" abaixo
 
-# 9. Dispare a DAG manualmente (schedule é 04:35 BRT — não roda automaticamente agora)
+# 9. Dispare a DAG manualmente (schedule=None — runs disparadas via UI para demonstração)
 #    Airflow UI → DAG banvic_elt → botão ▶ Trigger DAG
 
 # 10. Acompanhe a execução — com KubernetesExecutor cada task sobe como um pod separado
@@ -434,7 +434,7 @@ sequenceDiagram
     participant Marts as DW · staging / marts
     participant Meta as metadata.*
 
-    Airflow->>FS: dispara DAG (04:35 BRT · schedule diário)
+    Airflow->>FS: dispara DAG manualmente (schedule=None · projeto de certificação)
 
     loop poke a cada 30 s · timeout 300 s
         FS->>LZ: verifica transacoes.csv
@@ -616,7 +616,7 @@ make kind-down         # destrói o cluster
 │   │   └── test_resilience.py         # 10 testes de resiliência
 │   ├── ingestion/
 │   │   ├── test_idempotency.py        # 6 unit + 2 integration
-│   │   └── test_row_counts.py         # 14 integration (contagem fonte × destino)
+│   │   └── test_row_counts.py         # 20 integration (contagem fonte × destino)
 │   ├── dbt/
 │   │   └── test_model_coverage.py     # 7 testes de governança dos modelos dbt
 │   └── marts/

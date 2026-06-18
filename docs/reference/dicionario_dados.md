@@ -444,7 +444,8 @@ Pearson entre drivers candidatos e a métrica-alvo (transações por cliente), c
 | `significant_at_5pct` | BOOLEAN | Significativo a 5% (\|t\| > 1,96) |
 | `impact_rank` | BIGINT | Ranking por força de correlação (1 = maior) |
 
-**Drivers avaliados**: saldo_total, tempo_relacionamento, quantidade_contas, posse_credito_aprovado  
+**Drivers avaliados**: saldo_total, tempo_relacionamento, quantidade_contas, posse_credito_aprovado
+**Nota**: `quantidade_contas` é avaliado no SQL mas filtrado do resultado pois todos os 998 clientes possuem exatamente 1 conta (variância zero → `corr()` retorna NULL → `WHERE correlation IS NOT NULL` exclui a linha). O mart retorna 3 dos 4 drivers candidatos.
 **Limitação**: correlação indica associação, não causalidade  
 **Testes**: `driver` + `impact_rank` unique + not_null; `direction` accepted_values  
 **Fonte**: `mart_engajamento_cliente`

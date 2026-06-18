@@ -1,6 +1,7 @@
 """
 Testes de integracao dos marts analiticos de negocio (Camila + CEO).
-Marca: @pytest.mark.integration - requerem `make up` + DAG executada (marts construidos).
+Marca: @pytest.mark.integration - requerem ambiente no ar (Docker Compose ou Kind)
++ DAG executada (marts construidos).
 Execute: pytest -m integration tests/marts/test_marts_analiticos.py
 """
 from __future__ import annotations
@@ -11,7 +12,6 @@ VALID_ENGAGEMENT = {"active", "at_risk", "churned", "never_used"}
 EXPECTED_DRIVERS = {
     "saldo_total",
     "tempo_relacionamento",
-    "quantidade_contas",
     "posse_credito_aprovado",
 }
 
@@ -84,7 +84,12 @@ def test_kpi_comercial_status_partition(dw_conn) -> None:
 
 @pytest.mark.integration
 def test_ranking_has_expected_drivers(dw_conn) -> None:
-    """mart_ranking_alavancas cobre exatamente os 4 drivers candidatos."""
+    """mart_ranking_alavancas retorna os drivers com correlacao nao-nula.
+
+    O SQL avalia 4 drivers, mas 'quantidade_contas' tem variância zero no dataset
+    (todos os 998 clientes possuem exatamente 1 conta), fazendo corr() retornar NULL.
+    O WHERE correlation IS NOT NULL do mart filtra essa linha corretamente.
+    """
     with dw_conn.cursor() as cur:
         cur.execute('SELECT driver FROM marts.mart_ranking_alavancas')
         found = {row[0] for row in cur.fetchall()}

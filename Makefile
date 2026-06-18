@@ -164,15 +164,19 @@ kind-deploy:
 	kubectl apply -f k8s/postgres/ -n banvic
 	kubectl apply -f k8s/airflow/airflow-db-statefulset.yaml -n banvic
 	kubectl apply -f k8s/metabase/ -n banvic
-	@echo "Criando PV de logs e corrigindo permissões no nó Kind..."
+	@echo "Criando diretórios no nó Kind e corrigindo permissões..."
 	docker exec $(KIND_CLUSTER)-control-plane mkdir -p /tmp/airflow-logs
 	docker exec $(KIND_CLUSTER)-control-plane chown -R 50000:0 /tmp/airflow-logs
 	docker exec $(KIND_CLUSTER)-control-plane chmod -R 775 /tmp/airflow-logs
+	docker exec $(KIND_CLUSTER)-control-plane mkdir -p /mnt/landing-data
+	docker exec $(KIND_CLUSTER)-control-plane chmod 777 /mnt/landing-data
 	kubectl apply -f k8s/airflow/logs-pv.yaml
+	@echo "Aguardando airflow-db ficar pronto (até 3 min)..."
+	kubectl wait --for=condition=ready pod/airflow-db-0 -n banvic --timeout=180s
 	@echo "Baixando chart do Airflow 1.13.0..."
 	curl -sSL -o /tmp/airflow-1.13.0.tgz \
 		https://github.com/apache/airflow/releases/download/helm-chart%2F1.13.0/airflow-1.13.0.tgz
-	helm install airflow /tmp/airflow-1.13.0.tgz -n banvic -f k8s/airflow/values.yaml
+	helm install airflow /tmp/airflow-1.13.0.tgz -n banvic -f k8s/airflow/values.yaml --timeout 10m
 	rm -f /tmp/airflow-1.13.0.tgz
 	@echo "OK: deploy concluído — namespace, secrets, postgres, airflow-db, metabase e Airflow aplicados."
 	@echo "    Aguarde os pods ficarem 1/1 Running: kubectl get pods -n banvic -w"

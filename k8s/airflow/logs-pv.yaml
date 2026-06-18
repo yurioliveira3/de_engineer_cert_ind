@@ -8,7 +8,7 @@ spec:
   accessModes:
     - ReadWriteMany
   persistentVolumeReclaimPolicy: Retain
-  storageClassName: ""
+  storageClassName: "standard"
   hostPath:
     path: /tmp/airflow-logs
     type: DirectoryOrCreate

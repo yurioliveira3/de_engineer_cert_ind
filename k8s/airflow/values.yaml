@@ -93,7 +93,7 @@ logs:
   persistence:
     enabled: true
     size: 1Gi
-    storageClassName: ""
+    storageClassName: "standard"
 
 extraVolumes:
 - name: landing-zone

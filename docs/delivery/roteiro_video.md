@@ -1,16 +1,17 @@
 # Roteiro do Vídeo - BanVic ELT Pipeline
 
-**Duração total:** 4:30 - 4:45 minutos  
-**Formato:** screen recording + narração  
-**Estrutura:** 6 etapas faseadas, cada uma com o que mostrar na tela e o que falar
+**Duração total:** 4:35 - 4:45 minutos
+**Formato:** screen recording + narração
+**Ambiente:** Kubernetes local com Kind (KubernetesExecutor)
+**Estrutura:** 7 etapas faseadas, cada uma com o que mostrar na tela e o que falar
 
-> **Dica de gravação:** rode `make up` e dispare a DAG **antes** de começar a gravar.
+> **Dica de gravação:** rode `make kind-start` e dispare a DAG **antes** de começar a gravar.
 > Mostre resultados já prontos — execução em tempo real dentro de um vídeo de 5 min
-> não é viável. A única exceção é o pytest (Etapa 5), que roda rápido.
+> não é viável. A única exceção é o pytest (Etapa 6), que roda rápido.
 
 ---
 
-## Etapa 1 — Apresentação e Arquitetura `[0:00 - 0:40]`
+## Etapa 1 — Apresentação e Arquitetura `[0:00 - 0:35]`
 
 **O que mostrar na tela**
 - Abra `docs/architectures/arquitetura_dados.drawio` no draw.io (ou a imagem exportada)
@@ -22,28 +23,33 @@
 >
 > O projeto cobre toda a stack: **ingestão com Meltano** extraindo dados de um PostgreSQL
 > simulando um ERP bancário e de um arquivo CSV de transações; **orquestração com Apache
-> Airflow**; **transformação com dbt** em três camadas — bronze, silver e gold; e
-> **Metabase** para visualização. Tudo roda em Docker Compose para desenvolvimento e em
-> Kubernetes com Kind para produção. Vamos ver isso funcionando."
+> Airflow** rodando em **Kubernetes** com KubernetesExecutor; **transformação com dbt** em
+> três camadas — bronze, silver e gold; e **Metabase** para visualização. Tudo roda em
+> Kubernetes local com Kind. Vamos ver isso funcionando."
 
 ---
 
-## Etapa 2 — Deploy do Ambiente `[0:40 - 1:20]`
+## Etapa 2 — Deploy no Kubernetes `[0:35 - 1:20]`
 
 **O que mostrar na tela**
-1. Terminal na raiz do projeto — mostre o resultado já rodando: `docker compose ps`
-2. Abra brevemente o `.env.example` para mostrar a estratégia de segredos
+1. Terminal — mostre o cluster já rodando: `kubectl get pods -n banvic`
+2. Abra brevemente o `.env.example` para mostrar a origem dos segredos
 
 **O que falar**
-> "Com um único comando — `make up` — o ambiente completo sobe: source Postgres com os
-> dados do ERP, o Data Warehouse, o Airflow, o Meltano, o dbt e o Metabase.
+> "O ambiente completo sobe em Kubernetes local com Kind — um único comando `make
+> kind-start` cria o cluster, constrói a imagem, gera os Secrets e aplica todos os
+> manifests.
 >
-> **Nenhuma credencial está no código.** Senhas e chaves ficam no `.env`, que está no
-> `.gitignore`. O Airflow recebe suas conexões via variável de ambiente `AIRFLOW_CONN_*`
-> — sem configuração manual na UI, sem segredo em repositório."
+> Aqui estão os pods: source-postgres com os dados do ERP, o Data Warehouse,
+> o Metabase, e o Airflow com scheduler, webserver e triggerer — todos Running.
+>
+> **Nenhuma credencial está no código.** As senhas partem do `.env` — que está no
+> `.gitignore` — e são convertidas em Kubernetes Secrets via `make kind-secrets`.
+> O Airflow recebe suas conexões via `secretKeyRef` — sem configuração manual na UI,
+> sem segredo em repositório."
 
 ```bash
-docker compose ps
+kubectl get pods -n banvic
 ```
 
 ---
@@ -68,23 +74,24 @@ docker compose ps
 > pipeline falha aqui com erro claro, antes de gastar processamento com o dbt. Só então
 > o dbt roda: transformações e depois testes de qualidade.
 >
-> Todas as tasks têm retries com backoff exponencial e um `on_failure_callback` que loga
-> erros estruturados."
+> Como usamos **KubernetesExecutor**, cada uma dessas tasks executou como um pod isolado
+> no cluster — isolamento completo entre as etapas. Todas as tasks têm retries com
+> backoff exponencial e um `on_failure_callback` que loga erros estruturados."
 
 ---
 
-## Etapa 4 — Dados no Destino `[2:30 - 3:20]`
+## Etapa 4 — Dados no Destino `[2:30 - 2:55]`
 
 **O que mostrar na tela**
-1. Terminal com psql no DW — tabelas raw (Bronze)
-2. Query nos marts de negócio (Gold) — narrativa Camila + CEO
+1. Terminal com `kubectl exec` no DW — tabelas raw (Bronze)
 
 **O que falar**
-> "Com a DAG verde, os dados chegaram no destino. Vou consultar o Data Warehouse."
+> "Com a DAG verde, os dados chegaram no destino. Vou consultar o Data Warehouse
+> direto no pod do Postgres."
 
 ```bash
 # Camada Bronze — raw (saída do Meltano, FULL_TABLE)
-docker compose exec dw-postgres psql -U analytics -d analytics_dw \
+kubectl exec -n banvic dw-postgres-0 -- psql -U analytics -d analytics_dw \
   -c "SELECT schemaname, tablename, n_live_tup
       FROM pg_stat_user_tables
       WHERE schemaname = 'raw'
@@ -92,34 +99,35 @@ docker compose exec dw-postgres psql -U analytics -d analytics_dw \
 ```
 
 > "7 tabelas na camada bronze, populadas com FULL_TABLE — o que garante idempotência:
-> rodar a DAG duas vezes no mesmo dia produz exatamente o mesmo resultado, sem duplicação.
->
-> Na camada gold, os marts de negócio respondem perguntas concretas. Para a Camila,
-> gerente comercial: quais clientes estão em risco de churn?"
-
-```bash
-# Narrativa Camila — engajamento e risco de churn
-docker compose exec dw-postgres psql -U analytics -d analytics_dw \
-  -c "SELECT engagement_status, COUNT(*) AS clientes
-      FROM marts.mart_engajamento_cliente
-      GROUP BY 1 ORDER BY 2 DESC;"
-
-# Narrativa CEO Sofia — quais alavancas movem o ponteiro?
-docker compose exec dw-postgres psql -U analytics -d analytics_dw \
-  -c "SELECT driver, correlation, significant_at_5pct, impact_rank
-      FROM marts.mart_ranking_alavancas
-      ORDER BY impact_rank;"
-```
-
-> "E para a CEO Sofia: um ranking de correlação de Pearson entre cada driver candidato
-> e o número de transações por cliente — com t-statistic para significância estatística."
+> rodar a DAG duas vezes produz exatamente o mesmo resultado, sem duplicação. Na
+> sequência, o dbt transformou esses dados em marts de negócio na camada gold —
+> que veremos agora no Metabase."
 
 ---
 
-## Etapa 5 — Qualidade e Testes `[3:20 - 4:05]`
+## Etapa 5 — Visualização no Metabase `[2:55 - 3:35]`
 
 **O que mostrar na tela**
-1. Terminal com os testes pytest rodando — deixe a saída aparecer
+1. Abra `http://localhost:3000` — Metabase
+2. Mostre o dashboard comercial com o gráfico de distribuição de engajamento
+3. Abra a pergunta do ranking de alavancas (native query)
+
+**O que falar**
+> "Os marts da camada Gold ficam disponíveis para consumo direto no Metabase — a
+> ferramenta de BI escolhida pelo BanVic. Aqui está o dashboard comercial que atende
+> o pedido da CEO Sofia: a distribuição de clientes por status de engajamento —
+> ativos, em risco, churned e sem uso — base para a campanha de retenção da Camila.
+>
+> E o ranking de alavancas: cada driver com sua correlação de Pearson e flag de
+> significância estatística. O Metabase consome direto do schema `marts` — sem
+> camada intermediária, sem planilha, sem export manual."
+
+---
+
+## Etapa 6 — Qualidade e Testes `[3:35 - 4:20]`
+
+**O que mostrar na tela**
+1. Terminal com `make kind-test` rodando — deixe a saída aparecer
 2. Mostre o resultado: `41 passed, 31 deselected`
 
 **O que falar**
@@ -128,61 +136,53 @@ docker compose exec dw-postgres psql -U analytics -d analytics_dw \
 > modelos dbt e integridade dos dados.
 >
 > Os 41 testes de unidade rodam no CI via GitHub Actions a cada push — sem banco.
-> Os 31 de integração rodam contra o banco real via `make test-integration`."
+> Aqui no cluster eu rodo direto no pod do scheduler:"
 
 ```bash
-# testes unitários (sem banco, rápidos) — com Docker Compose no ar
-docker compose exec airflow-scheduler \
-  /home/airflow/tool-venv/bin/python -m pytest tests/ -m "not integration" -q
+make kind-test
 ```
 
-> **Se estiver gravando com Kind no ar** (sem Docker Compose): copie os arquivos de
-> teste para o pod do scheduler e rode via `kubectl exec`. Veja o bloco "Rodando com
-> Kubernetes / Kind" na seção Testes do `README.md`.
-
-> "Além desses, o dbt executa mais 69 data tests na etapa `dbt_test` — dois deles falham
-> intencionalmente, capturando uma inconsistência real de integridade referencial no dado
-> fonte. Isso demonstra que a camada Silver detecta defeitos antes de contaminar a Gold."
+> "Além desses, o dbt executa mais 69 data tests na etapa `dbt_test` — dois deles
+> geram alerta (`severity: warn`), capturando uma inconsistência real de integridade
+> referencial no dado fonte: o cliente 528 existe em contas e propostas de crédito,
+> mas não no cadastro de clientes. O pipeline não é interrompido, mas o defeito fica
+> registrado em `metadata.test_results` e visível no dashboard de qualidade. Isso
+> demonstra que a camada Silver detecta defeitos antes de contaminar a Gold."
 
 ---
 
-## Etapa 6 — Kubernetes e Encerramento `[4:05 - 4:45]`
+## Etapa 7 — Encerramento `[4:20 - 4:45]`
 
 **O que mostrar na tela**
-1. Terminal com `kubectl get pods -n banvic` (cluster já rodando)
-2. Feche com o `README.md` aberto
+1. Feche com o `README.md` aberto
 
 **O que falar**
-> "Para produção, o mesmo pipeline roda em Kubernetes local com Kind. Os manifests em
-> `k8s/` cobrem namespace, Kubernetes Secrets, StatefulSets para os três bancos Postgres
-> com PVCs, Deployment do Metabase, e o Airflow via Helm chart com KubernetesExecutor.
-> Os dados são montados via `extraMounts` do Kind — o pipeline roda end-to-end também
-> no cluster, não só no Compose.
+> "Isso cobre o pipeline completo: ingestão com Meltano, orquestração com Airflow em
+> Kubernetes, transformação com dbt em arquitetura Medallion, visualização no Metabase
+> e qualidade assegurada por 72 testes automatizados.
 >
-> Para mais detalhes, prints das execuções, diagramas de arquitetura e o passo a passo
-> completo de replicação, acesse o `README.md` do repositório. Obrigado!"
-
-```bash
-kubectl get pods -n banvic
-```
+> Para mais detalhes, diagramas de arquitetura e o passo a passo completo de
+> replicação — tanto em Docker Compose quanto em Kubernetes — acesse o `README.md`
+> do repositório. Obrigado!"
 
 ---
 
 ## Checklist antes de gravar
 
-**Docker Compose**
-- [ ] `make up` rodado, todos os containers `healthy` (`docker compose ps`)
-- [ ] DAG `banvic_elt` com pelo menos uma execução verde no histórico
-- [ ] Logs da task `validate_raw_load` visíveis na UI do Airflow (confirma que os dados chegaram)
-
-**Kubernetes / Kind** (alternativa)
+**Kubernetes / Kind**
 - [ ] Cluster Kind no ar (`kubectl get pods -n banvic` todos `Running`)
-- [ ] DAG `banvic_elt` executada e verde no histórico (`make kind-admin-password` feito)
-- [ ] Logs da task `validate_raw_load` visíveis na UI — requer `logs.persistence` configurado via `make kind-upgrade` (ver `CLAUDE.md`)
-- [ ] Testes rodando: `make kind-test` → `41 passed`
+- [ ] `make kind-start` executado com sucesso (cluster → imagem → secrets → deploy → admin)
+- [ ] `make kind-upgrade` aplicado (configura PV de logs — sem isso os logs das tasks não aparecem na UI)
+- [ ] DAG `banvic_elt` executada e verde no histórico
+- [ ] Logs da task `validate_raw_load` visíveis na UI (confirma que os dados chegaram)
+- [ ] Testes validados: `make kind-test` → `41 passed`
+
+**Metabase**
+- [ ] Metabase configurado (`http://localhost:3000`) com conexão ao DW `analytics_dw`
+- [ ] Dashboard comercial visível com o gráfico de engajamento (`mart_engajamento_cliente`)
+- [ ] Pergunta do ranking de alavancas criada (`mart_ranking_alavancas`)
 
 **Geral**
-- [ ] Metabase configurado e com um dashboard básico visível (opcional)
 - [ ] Terminal com fonte legível (mínimo 16pt), fundo escuro
 - [ ] Janela do Airflow em 100% de zoom para legibilidade
 - [ ] Microfone testado
@@ -194,9 +194,10 @@ kubectl get pods -n banvic
 
 | Etapa | Conteúdo | Tempo |
 |---|---|---|
-| 1 | Apresentação + arquitetura | 0:00 – 0:40 |
-| 2 | Deploy (`make up`) + segredos | 0:40 – 1:20 |
-| 3 | Airflow: topologia + gate + execução verde | 1:20 – 2:30 |
-| 4 | Bronze raw + marts Camila + ranking CEO | 2:30 – 3:20 |
-| 5 | Pytest 41 unit + 2 falhas esperadas no dbt | 3:20 – 4:05 |
-| 6 | Kind/K8s + encerramento | 4:05 – 4:45 |
+| 1 | Apresentação + arquitetura | 0:00 – 0:35 |
+| 2 | Deploy no Kubernetes (Kind) + segredos | 0:35 – 1:20 |
+| 3 | Airflow: topologia + KubernetesExecutor + execução verde | 1:20 – 2:30 |
+| 4 | Bronze raw (kubectl exec psql) — só contagem | 2:30 – 2:55 |
+| 5 | Metabase: dashboard engajamento + ranking CEO | 2:55 – 3:35 |
+| 6 | Pytest 41 unit (make kind-test) + 2 warns esperados no dbt | 3:35 – 4:20 |
+| 7 | Encerramento (recap + README) | 4:20 – 4:45 |

@@ -97,7 +97,7 @@ wait_transacoes_csv     -> success
 el_extract_load_sql     -> success
 el_extract_load_csv     -> success
 dbt_run                 -> success
-dbt_test                -> success  (45 PASS, 2 WARN - client_id=528, documentado)
+dbt_test                -> success  (67 PASS, 2 WARN - client_id=528, documentado)
 validate_load           -> success
 ```
 
@@ -178,7 +178,7 @@ make down
 
 ```bash
 make kind-up
-# Cria cluster 'banvic' com 1 control-plane + 2 workers
+# Cria cluster 'banvic' com 1 control-plane (NodePort 8080→Airflow, 3000→Metabase)
 ```
 
 ### 2. Construir e carregar imagem
@@ -192,50 +192,25 @@ make kind-load
 ### 3. Criar secrets K8s
 
 ```bash
-# Gerar k8s/secrets.yaml a partir do .env
-python3 - <<'EOF'
-import base64, os
-from pathlib import Path
-from dotenv import dotenv_values
-
-env = dotenv_values(".env")
-keys = [
-    "SOURCE_POSTGRES_USER", "SOURCE_POSTGRES_PASSWORD",
-    "DW_POSTGRES_USER", "DW_POSTGRES_PASSWORD",
-    "AIRFLOW_DB_USER", "AIRFLOW_DB_PASSWORD",
-    "AIRFLOW_FERNET_KEY", "AIRFLOW__WEBSERVER__SECRET_KEY",
-]
-lines = ["apiVersion: v1", "kind: Secret", "metadata:", "  name: banvic-secrets",
-         "  namespace: banvic", "type: Opaque", "data:"]
-for k in keys:
-    v = base64.b64encode(env[k].encode()).decode()
-    lines.append(f"  {k}: {v}")
-
-# Airflow metadata connection string
-conn = f"postgresql+psycopg2://{env['AIRFLOW_DB_USER']}:{env['AIRFLOW_DB_PASSWORD']}@airflow-db:5432/airflow"
-v = base64.b64encode(conn.encode()).decode()
-lines.append(f"  connection: {v}")
-
-Path("k8s/secrets.yaml").write_text("\n".join(lines))
-print("k8s/secrets.yaml gerado.")
-EOF
-```
+make kind-secrets
+# Gera k8s/secrets.yaml a partir do .env (base64 automático)
 
 ### 4. Deploy
 
 ```bash
 make kind-deploy
-
-# Helm para Airflow (após kind-deploy)
-helm repo add apache-airflow https://airflow.apache.org
-helm upgrade --install airflow apache-airflow/airflow \
-  --version 1.16.0 \
-  -n banvic \
-  -f k8s/airflow/values.yaml \
-  --wait --timeout 10m
+# Aplica namespace, secrets, postgres, airflow-db, metabase, PV de logs
+# e instala Airflow via Helm chart 1.13.0 (baixado e removido automaticamente)
 ```
 
-### 5. Verificar pods
+### 5. Criar usuário admin
+
+```bash
+make kind-admin-password
+# Cria usuário admin com AIRFLOW_ADMIN_PASSWORD do .env
+```
+
+### 6. Verificar pods
 
 ```bash
 kubectl get pods -n banvic
@@ -243,14 +218,15 @@ kubectl get pods -n banvic
 # Airflow: scheduler, webserver, triggerer - todos Running
 ```
 
-### 6. Acessar Airflow
+### 7. Acessar serviços
 
 ```bash
-kubectl port-forward svc/airflow-webserver 8080:8080 -n banvic &
-# Acesse: http://localhost:8080
+# NodePort já mapeado no kind-cluster.yaml — sem port-forward
+# Airflow:  http://localhost:8080  (usuário: admin / senha do .env)
+# Metabase: http://localhost:3000
 ```
 
-### 7. Destruir cluster
+### 8. Destruir cluster
 
 ```bash
 make kind-down
@@ -299,8 +275,8 @@ competiam pelo mesmo `tap-postgres-to-target-postgres` lock no Meltano.
 make dbt-test
 
 # Resultado esperado:
-# Finished running 47 tests
-# Completed with 45 passed, 2 warnings, 0 errors.
+# Finished running 69 tests
+# Completed with 67 passed, 2 warnings, 0 errors.
 #
 # WARN:
 #   relationships_stg_contas_client_id__stg_clientes__client_id (severity: warn)
