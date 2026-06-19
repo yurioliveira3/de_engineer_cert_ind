@@ -12,6 +12,7 @@ Estratégia em duas camadas:
 
 Execute testes de integração: pytest -m integration tests/ingestion/test_idempotency.py
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -25,8 +26,12 @@ MELTANO_YML = PROJECT_ROOT / "meltano" / "meltano.yml"
 MELTANO_ROOT = PROJECT_ROOT / "meltano"
 
 SQL_TABLES = [
-    "agencias", "clientes", "colaboradores",
-    "colaborador_agencia", "contas", "propostas_credito",
+    "agencias",
+    "clientes",
+    "colaboradores",
+    "colaborador_agencia",
+    "contas",
+    "propostas_credito",
 ]
 
 
@@ -36,9 +41,7 @@ SQL_TABLES = [
 def test_tap_postgres_uses_full_table_replication() -> None:
     """tap-postgres configurado com FULL_TABLE - overwrite completo a cada execução."""
     config = yaml.safe_load(MELTANO_YML.read_text())
-    tap_pg = next(
-        e for e in config["plugins"]["extractors"] if e["name"] == "tap-postgres"
-    )
+    tap_pg = next(e for e in config["plugins"]["extractors"] if e["name"] == "tap-postgres")
     assert tap_pg["config"]["default_replication_method"] == "FULL_TABLE"
 
 
@@ -74,13 +77,15 @@ def test_meltano_jobs_defined() -> None:
 def test_tap_postgres_selects_expected_tables() -> None:
     """tap-postgres seleciona exatamente as 6 tabelas do ERP (transacoes vem do CSV)."""
     config = yaml.safe_load(MELTANO_YML.read_text())
-    tap_pg = next(
-        e for e in config["plugins"]["extractors"] if e["name"] == "tap-postgres"
-    )
+    tap_pg = next(e for e in config["plugins"]["extractors"] if e["name"] == "tap-postgres")
     selected = {s.split("-", 1)[1].rsplit(".", 1)[0] for s in tap_pg["select"]}
     expected = {
-        "agencias", "clientes", "colaboradores",
-        "colaborador_agencia", "contas", "propostas_credito",
+        "agencias",
+        "clientes",
+        "colaboradores",
+        "colaborador_agencia",
+        "contas",
+        "propostas_credito",
     }
     assert selected == expected, f"Selecao do tap-postgres divergente: {selected}"
 
@@ -160,8 +165,7 @@ def test_el_sql_idempotent_counts(dw_conn) -> None:
 
     counts_after = _count_all_raw(dw_conn)
     assert counts_current == counts_after, (
-        "Contagens divergiram apos 2a execucao:\n"
-        f"antes: {counts_current}\ndepois: {counts_after}"
+        f"Contagens divergiram apos 2a execucao:\nantes: {counts_current}\ndepois: {counts_after}"
     )
 
 
@@ -177,10 +181,6 @@ def test_el_sql_no_pk_duplicates(dw_conn) -> None:
     }
     with dw_conn.cursor() as cur:
         for table, pk in pk_cols.items():
-            cur.execute(
-                f'SELECT COUNT(*) - COUNT(DISTINCT "{pk}") FROM raw."{table}"'
-            )
+            cur.execute(f'SELECT COUNT(*) - COUNT(DISTINCT "{pk}") FROM raw."{table}"')
             duplicates = cur.fetchone()[0]
-            assert duplicates == 0, (
-                f"raw.{table}: {duplicates} PKs duplicadas após ingestão"
-            )
+            assert duplicates == 0, f"raw.{table}: {duplicates} PKs duplicadas após ingestão"

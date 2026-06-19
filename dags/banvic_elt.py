@@ -90,7 +90,6 @@ with DAG(
     tags=["banvic", "elt"],
     doc_md=DOC_MD,
 ) as dag:
-
     wait_transacoes = FileSensor(
         task_id="wait_transacoes_csv",
         filepath=LANDING_CSV,

@@ -5,6 +5,7 @@ Verifica que banvic_elt importa sem erros e tem a estrutura esperada:
 topologia, retries, catchup, max_active_runs, tags, on_failure_callback.
 Sem subir Airflow completo - usa DagBag + SQLite em memória (conftest.py).
 """
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -51,9 +52,7 @@ def test_schedule_is_none(dag) -> None:
 def test_start_date_timezone_sao_paulo(dag) -> None:
     # dag.start_date é normalizado para UTC pelo Airflow; dag.timezone preserva o tz original.
     tz_name = str(dag.timezone)
-    assert "Sao_Paulo" in tz_name, (
-        f"DAG deve usar timezone America/Sao_Paulo, obtido: {tz_name}"
-    )
+    assert "Sao_Paulo" in tz_name, f"DAG deve usar timezone America/Sao_Paulo, obtido: {tz_name}"
 
 
 def test_all_tasks_have_execution_timeout(dag) -> None:
@@ -111,9 +110,7 @@ def test_topology_sensor_is_root(dag) -> None:
 def test_topology_el_tasks_depend_on_sensor(dag) -> None:
     for task_id in ("el_extract_load_sql", "el_extract_load_csv"):
         upstream = {t.task_id for t in dag.get_task(task_id).upstream_list}
-        assert "wait_transacoes_csv" in upstream, (
-            f"{task_id} deve depender de wait_transacoes_csv"
-        )
+        assert "wait_transacoes_csv" in upstream, f"{task_id} deve depender de wait_transacoes_csv"
 
 
 def test_topology_el_tasks_are_parallel(dag) -> None:

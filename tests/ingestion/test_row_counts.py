@@ -8,6 +8,7 @@ Variáveis de ambiente (com defaults docker-compose):
   SOURCE_POSTGRES_HOST/PORT/USER/PASSWORD/DB
   DW_POSTGRES_HOST/PORT/USER/PASSWORD/DB
 """
+
 from __future__ import annotations
 
 import csv
@@ -77,9 +78,7 @@ def test_raw_count_matches_source(source_conn, dw_conn, table) -> None:
         cur.execute(f'SELECT COUNT(*) FROM raw."{table}"')
         raw_count = cur.fetchone()[0]
 
-    assert raw_count == source_count, (
-        f"raw.{table}: {raw_count} linhas, source tem {source_count}"
-    )
+    assert raw_count == source_count, f"raw.{table}: {raw_count} linhas, source tem {source_count}"
 
 
 @pytest.mark.integration
@@ -96,9 +95,7 @@ def test_raw_transacoes_count_matches_csv(dw_conn) -> None:
         cur.execute('SELECT COUNT(*) FROM raw."transacoes"')
         raw_count = cur.fetchone()[0]
 
-    assert raw_count == csv_count, (
-        f"raw.transacoes: {raw_count} linhas, CSV tem {csv_count}"
-    )
+    assert raw_count == csv_count, f"raw.transacoes: {raw_count} linhas, CSV tem {csv_count}"
 
 
 # -- Integridade de chaves primárias ---------------------------------

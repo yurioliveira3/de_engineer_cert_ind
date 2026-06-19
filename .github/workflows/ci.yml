@@ -24,6 +24,9 @@ jobs:
       - name: ruff - DAGs e testes
         run: ruff check dags/ tests/
 
+      - name: ruff format --check - DAGs e testes
+        run: ruff format --check dags/ tests/
+
       - name: yamllint - meltano + docker-compose
         run: yamllint -c .yamllint meltano/meltano.yml docker-compose.yml
 

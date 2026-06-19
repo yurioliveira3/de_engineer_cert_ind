@@ -1,4 +1,5 @@
 """Configuração global de testes - env vars Airflow e fixtures compartilhadas."""
+
 from __future__ import annotations
 
 import os
@@ -18,6 +19,7 @@ def pytest_configure(config: "_pytest.config.Config") -> None:
         "markers",
         "integration: testes que requerem docker compose up e dados carregados",
     )
+
 
 # Airflow precisa de uma string de conexão válida mesmo em modo teste
 os.environ.setdefault("AIRFLOW__DATABASE__SQL_ALCHEMY_CONN", "sqlite:////tmp/airflow_test.db")

@@ -14,6 +14,7 @@ Nota sobre F2-05 - Comportamento de retry real:
   nos testes abaixo. Testes de integração completos requerem pytest-docker ou
   testcontainers, fora do escopo desta suíte unitária.
 """
+
 from __future__ import annotations
 
 import logging
@@ -123,9 +124,7 @@ def test_all_tasks_have_exponential_backoff(dag) -> None:
 def test_all_tasks_have_retry_delay(dag) -> None:
     """retry_delay configurado em todas as tasks."""
     for task in dag.tasks:
-        assert task.retry_delay is not None, (
-            f"Task '{task.task_id}': retry_delay é None"
-        )
+        assert task.retry_delay is not None, f"Task '{task.task_id}': retry_delay é None"
 
 
 def test_validate_raw_is_gate_before_dbt(dag) -> None:

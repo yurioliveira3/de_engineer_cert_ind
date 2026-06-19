@@ -3,6 +3,7 @@ Governanca de modelos dbt: garante que todo modelo SQL esta documentado e
 testado nos arquivos _*.yml. Sao testes unitarios - leem os arquivos do
 projeto, sem banco. Pegam regressoes de cobertura (modelo novo sem teste).
 """
+
 from __future__ import annotations
 
 from pathlib import Path
