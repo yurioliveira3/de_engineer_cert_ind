@@ -116,9 +116,9 @@ def test_callback_logs_exception_message(caplog) -> None:
 def test_all_tasks_have_exponential_backoff(dag) -> None:
     """retry_exponential_backoff=True em todas as tasks - backoff progressivo entre retries."""
     for task in dag.tasks:
-        assert getattr(task, "retry_exponential_backoff", False) is True, (
-            f"Task '{task.task_id}' sem retry_exponential_backoff"
-        )
+        assert (
+            getattr(task, "retry_exponential_backoff", False) is True
+        ), f"Task '{task.task_id}' sem retry_exponential_backoff"
 
 
 def test_all_tasks_have_retry_delay(dag) -> None:

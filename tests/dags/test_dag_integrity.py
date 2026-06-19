@@ -44,9 +44,9 @@ def test_tags_present(dag) -> None:
 def test_schedule_is_none(dag) -> None:
     # schedule=None: projeto educacional — runs disparadas manualmente para demonstração.
     # Em produção seria "35 4 * * *" (04:35 BRT).
-    assert dag.schedule_interval is None, (
-        f"schedule esperado None (manual), obtido '{dag.schedule_interval}'"
-    )
+    assert (
+        dag.schedule_interval is None
+    ), f"schedule esperado None (manual), obtido '{dag.schedule_interval}'"
 
 
 def test_start_date_timezone_sao_paulo(dag) -> None:
@@ -57,16 +57,16 @@ def test_start_date_timezone_sao_paulo(dag) -> None:
 
 def test_all_tasks_have_execution_timeout(dag) -> None:
     for task in dag.tasks:
-        assert task.execution_timeout is not None, (
-            f"Task '{task.task_id}' sem execution_timeout - risco de hang infinito"
-        )
+        assert (
+            task.execution_timeout is not None
+        ), f"Task '{task.task_id}' sem execution_timeout - risco de hang infinito"
 
 
 def test_retry_delay_is_five_minutes(dag) -> None:
     for task in dag.tasks:
-        assert task.retry_delay == timedelta(minutes=5), (
-            f"Task '{task.task_id}': retry_delay inesperado ({task.retry_delay})"
-        )
+        assert task.retry_delay == timedelta(
+            minutes=5
+        ), f"Task '{task.task_id}': retry_delay inesperado ({task.retry_delay})"
 
 
 # -- Tasks: retries e callbacks --------------------------------------
@@ -74,16 +74,16 @@ def test_retry_delay_is_five_minutes(dag) -> None:
 
 def test_all_tasks_have_retries(dag) -> None:
     for task in dag.tasks:
-        assert task.retries >= 1, (
-            f"Task '{task.task_id}' tem retries={task.retries} - mínimo esperado: 1"
-        )
+        assert (
+            task.retries >= 1
+        ), f"Task '{task.task_id}' tem retries={task.retries} - mínimo esperado: 1"
 
 
 def test_all_tasks_have_failure_callback(dag) -> None:
     for task in dag.tasks:
-        assert task.on_failure_callback is not None, (
-            f"Task '{task.task_id}' sem on_failure_callback - falhas silenciosas não aceitáveis"
-        )
+        assert (
+            task.on_failure_callback is not None
+        ), f"Task '{task.task_id}' sem on_failure_callback - falhas silenciosas não aceitáveis"
 
 
 # -- Topologia -------------------------------------------------------

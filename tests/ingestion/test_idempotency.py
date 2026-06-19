@@ -119,9 +119,9 @@ def _run_el_sql() -> None:
         text=True,
         timeout=300,
     )
-    assert result.returncode == 0, (
-        f"meltano run el-sql falhou (rc={result.returncode}):\n{result.stderr}"
-    )
+    assert (
+        result.returncode == 0
+    ), f"meltano run el-sql falhou (rc={result.returncode}):\n{result.stderr}"
 
 
 EXPECTED_RAW_COUNTS = {
@@ -164,9 +164,9 @@ def test_el_sql_idempotent_counts(dw_conn) -> None:
         )
 
     counts_after = _count_all_raw(dw_conn)
-    assert counts_current == counts_after, (
-        f"Contagens divergiram apos 2a execucao:\nantes: {counts_current}\ndepois: {counts_after}"
-    )
+    assert (
+        counts_current == counts_after
+    ), f"Contagens divergiram apos 2a execucao:\nantes: {counts_current}\ndepois: {counts_after}"
 
 
 @pytest.mark.integration
