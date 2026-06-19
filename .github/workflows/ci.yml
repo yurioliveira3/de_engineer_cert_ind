@@ -19,7 +19,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install linters
-        run: pip install ruff==0.4.* yamllint==1.35.* sqlfluff==4.2.*
+        run: pip install "ruff==0.4.*" "yamllint~=1.35" "sqlfluff~=4.2"
 
       - name: ruff - DAGs e testes
         run: ruff check dags/ tests/
@@ -48,11 +48,11 @@ jobs:
         run: |
           pip install \
             "apache-airflow==2.9.2" \
-            "apache-airflow-providers-postgres>=5.0.0" \
-            "apache-airflow-providers-common-io>=1.0.0" \
+            "apache-airflow-providers-postgres~=5.0" \
+            "apache-airflow-providers-common-io~=1.0" \
             pytest \
             psycopg2-binary \
-            pyyaml \
+            "pyyaml~=6.0" \
             --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.9.2/constraints-3.12.txt"
 
       - name: pytest - testes unitários (toda a suíte, exceto integração)
@@ -70,7 +70,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dbt-postgres
-        run: pip install "dbt-postgres==1.9.*"
+        run: pip install "dbt-postgres~=1.9"
 
       - name: dbt deps
         working-directory: dbt_project
@@ -98,7 +98,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install pyyaml
-        run: pip install pyyaml
+        run: pip install "pyyaml~=6.0"
 
       - name: Verificar estrutura meltano.yml
         run: |

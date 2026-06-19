@@ -9,7 +9,7 @@ plugins:
   extractors:
     - name: tap-postgres
       namespace: tap_postgres
-      pip_url: meltanolabs-tap-postgres
+      pip_url: meltanolabs-tap-postgres~=0.8.3
       executable: tap-postgres
       capabilities:
         - state
@@ -35,7 +35,7 @@ plugins:
 
     - name: tap-csv
       namespace: tap_csv
-      pip_url: git+https://github.com/MeltanoLabs/tap-csv.git
+      pip_url: git+https://github.com/MeltanoLabs/tap-csv.git@v1.3.2
       executable: tap-csv
       capabilities:
         - state
@@ -47,7 +47,7 @@ plugins:
   loaders:
     - name: target-postgres
       namespace: target_postgres
-      pip_url: meltanolabs-target-postgres
+      pip_url: meltanolabs-target-postgres~=0.8.0
       executable: target-postgres
       capabilities:
         - about

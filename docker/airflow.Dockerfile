@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 USER airflow
 
 # Provider Postgres para Airflow 2.9.x (sem atualizar o core)
-RUN pip install --no-cache-dir "apache-airflow-providers-postgres==5.10.0"
+RUN pip install --no-cache-dir "apache-airflow-providers-postgres~=5.10"
 
 # Meltano + dbt em venv isolado -> evita conflito de SQLAlchemy (Airflow 2.9 usa 1.x; Meltano 3.7+ exige 2.x)
 RUN python3 -m venv /home/airflow/tool-venv && \
