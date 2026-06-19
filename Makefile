@@ -1,4 +1,4 @@
-.PHONY: help up down build seed logs-airflow meltano-install start \
+.PHONY: help up down build logs-airflow meltano-install start \
         kind-up kind-load kind-deploy kind-down kind-start kind-upgrade \
         kind-secrets kind-admin-password kind-test \
         dbt-run dbt-test lint lint-sql fix-sql test test-integration
@@ -7,6 +7,9 @@ COMPOSE = docker compose
 KIND_CLUSTER = banvic
 IMAGE_NAME = banvic-airflow
 IMAGE_TAG  = latest
+AIRFLOW_CHART_VERSION = 1.13.0
+AIRFLOW_CHART_URL = https://github.com/apache/airflow/releases/download/helm-chart%2F$(AIRFLOW_CHART_VERSION)/airflow-$(AIRFLOW_CHART_VERSION).tgz
+AIRFLOW_CHART_TGZ = /tmp/airflow-$(AIRFLOW_CHART_VERSION).tgz
 
 help:
 	@echo ""
@@ -22,6 +25,7 @@ help:
 	@echo "  make down              derruba e remove volumes"
 	@echo "  make build             reconstrói a imagem Airflow"
 	@echo "  make logs-airflow      logs do scheduler/webserver"
+	@echo "  make meltano-install   instala plugins do Meltano no projeto"
 	@echo ""
 	@echo "Kubernetes / Kind (entrega):"
 	@echo "  make kind-up             cria o cluster Kind"
@@ -91,6 +95,7 @@ dbt-test:
 
 lint:
 	ruff check dags/ tests/
+	ruff format --check dags/ tests/
 	yamllint -c .yamllint meltano/meltano.yml docker-compose.yml
 	sqlfluff lint dbt_project/models
 
@@ -173,11 +178,10 @@ kind-deploy:
 	kubectl apply -f k8s/airflow/logs-pv.yaml
 	@echo "Aguardando airflow-db ficar pronto (até 3 min)..."
 	kubectl wait --for=condition=ready pod/airflow-db-0 -n banvic --timeout=180s
-	@echo "Baixando chart do Airflow 1.13.0..."
-	curl -sSL -o /tmp/airflow-1.13.0.tgz \
-		https://github.com/apache/airflow/releases/download/helm-chart%2F1.13.0/airflow-1.13.0.tgz
-	helm install airflow /tmp/airflow-1.13.0.tgz -n banvic -f k8s/airflow/values.yaml --timeout 10m
-	rm -f /tmp/airflow-1.13.0.tgz
+	@echo "Baixando chart do Airflow $(AIRFLOW_CHART_VERSION)..."
+	curl -sSL -o $(AIRFLOW_CHART_TGZ) $(AIRFLOW_CHART_URL)
+	helm install airflow $(AIRFLOW_CHART_TGZ) -n banvic -f k8s/airflow/values.yaml --timeout 10m
+	rm -f $(AIRFLOW_CHART_TGZ)
 	@echo "OK: deploy concluído — namespace, secrets, postgres, airflow-db, metabase e Airflow aplicados."
 	@echo "    Aguarde os pods ficarem 1/1 Running: kubectl get pods -n banvic -w"
 
@@ -187,11 +191,10 @@ kind-upgrade:
 	docker exec $(KIND_CLUSTER)-control-plane chown -R 50000:0 /tmp/airflow-logs
 	docker exec $(KIND_CLUSTER)-control-plane chmod -R 775 /tmp/airflow-logs
 	kubectl apply -f k8s/airflow/logs-pv.yaml
-	@echo "Baixando chart do Airflow 1.13.0..."
-	curl -sSL -o /tmp/airflow-1.13.0.tgz \
-		https://github.com/apache/airflow/releases/download/helm-chart%2F1.13.0/airflow-1.13.0.tgz
-	helm upgrade airflow /tmp/airflow-1.13.0.tgz -n banvic -f k8s/airflow/values.yaml
-	rm -f /tmp/airflow-1.13.0.tgz
+	@echo "Baixando chart do Airflow $(AIRFLOW_CHART_VERSION)..."
+	curl -sSL -o $(AIRFLOW_CHART_TGZ) $(AIRFLOW_CHART_URL)
+	helm upgrade airflow $(AIRFLOW_CHART_TGZ) -n banvic -f k8s/airflow/values.yaml
+	rm -f $(AIRFLOW_CHART_TGZ)
 	@echo "OK: Airflow atualizado. Aguarde os pods reiniciarem: kubectl get pods -n banvic -w"
 
 kind-down:

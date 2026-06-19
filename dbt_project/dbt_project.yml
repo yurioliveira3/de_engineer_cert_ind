@@ -1,14 +1,14 @@
-name: 'analytics_poc'
+name: 'banvic_dw'
 version: '1.0.0'
 config-version: 2
-profile: 'analytics'
+profile: 'banvic_dw'
 
 model-paths: ["models"]
 macro-paths: ["macros"]
 test-paths: ["tests"]
 
 models:
-  analytics_poc:
+  banvic_dw:
     staging:
       +materialized: view
       +schema: staging
