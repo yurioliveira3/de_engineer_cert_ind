@@ -13,9 +13,9 @@ last_tx_per_account as (
 
 classified as (
     select
-        c.account_id,
-        c.client_id,
-        c.agency_id,
+        c.account_id as account_sk,
+        c.client_id as client_fk,
+        c.agency_id as agency_fk,
         c.total_balance,
         lt.last_transaction_date,
         md.reference_date - lt.last_transaction_date as days_since_last_transaction,

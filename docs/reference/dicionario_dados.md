@@ -274,15 +274,15 @@ para garantir idempotência e performance no Metabase.
 
 | Coluna | Tipo | Descrição |
 |--------|------|-----------|
-| `account_id` | INTEGER | Identificador da conta |
-| `client_id` | INTEGER | Identificador do cliente |
-| `agency_id` | INTEGER | Identificador da agência |
+| `account_sk` | INTEGER | SK da conta (PK) |
+| `client_fk` | INTEGER | FK -> dimensão cliente |
+| `agency_fk` | INTEGER | FK -> dimensão agência |
 | `total_balance` | NUMERIC | Saldo total atual |
 | `last_transaction_date` | DATE | Data da última transação |
 | `days_since_last_transaction` | INTEGER | Dias sem movimentação |
 | `activity_status` | TEXT | `active` (≤90d) · `dormant` (>90d) · `never_used` |
 
-**Testes**: `account_id` unique + not_null; `activity_status` accepted_values  
+**Testes**: `account_sk` unique + not_null; `activity_status` accepted_values  
 **Fonte**: `stg_contas` ✕ `stg_transacoes`
 
 ---
@@ -310,7 +310,7 @@ para garantir idempotência e performance no Metabase.
 
 | Coluna | Tipo | Descrição |
 |--------|------|-----------|
-| `agency_id` | INTEGER | Identificador da agência |
+| `agency_sk` | INTEGER | SK da agência (PK) |
 | `agency_name` | TEXT | Nome da agência |
 | `agency_type` | TEXT | Tipo de agência |
 | `total_proposals` | BIGINT | Total de propostas vinculadas |
@@ -318,7 +318,7 @@ para garantir idempotência e performance no Metabase.
 | `conversion_rate_pct` | NUMERIC | Taxa de conversão (%) |
 | `total_proposal_amount` | NUMERIC | Volume total |
 
-**Testes**: `agency_id` unique + not_null  
+**Testes**: `agency_sk` unique + not_null  
 **Fonte**: `stg_agencias` ✕ `stg_colaborador_agencia` ✕ `stg_propostas_credito`
 
 ---
@@ -366,14 +366,14 @@ necessária no Metabase - resultado direto em qualquer dashboard.
 
 | Coluna | Tipo | Descrição |
 |--------|------|-----------|
-| `client_id` | INTEGER | Identificador do cliente |
+| `client_fk` | INTEGER | FK -> dimensão cliente |
 | `client_full_name` | TEXT | Nome completo |
-| `account_id` | INTEGER | Conta de referência |
+| `account_fk` | INTEGER | FK -> dimensão conta |
 | `total_balance` | NUMERIC | Saldo total (> R$ 20.000 por filtro) |
-| `agency_id` | INTEGER | Agência responsável |
+| `agency_fk` | INTEGER | FK -> dimensão agência |
 
 **Filtro aplicado**: `total_balance > 20000 AND cliente sem proposta aprovada`  
-**Testes**: `client_id` + `account_id` unique + not_null  
+**Testes**: `client_fk` + `account_fk` unique + not_null  
 **Fonte**: `stg_contas` x `stg_clientes` x `stg_propostas_credito`
 
 ---
@@ -385,7 +385,7 @@ por cliente, clientes ativos e risco de churn. Grão: 1 linha por cliente com co
 
 | Coluna | Tipo | Descrição |
 |--------|------|-----------|
-| `client_id` | INTEGER | Identificador do cliente (PK) |
+| `client_sk` | INTEGER | SK do cliente (PK) |
 | `client_full_name` | TEXT | Nome completo |
 | `client_type` | TEXT | Tipo de cliente (PF/PJ) |
 | `onboarding_date` | DATE | Data de inclusão do cliente |
@@ -401,7 +401,7 @@ por cliente, clientes ativos e risco de churn. Grão: 1 linha por cliente com co
 | `engagement_status` | TEXT | `active` / `at_risk` / `churned` / `never_used` |
 
 **Regra de status**: active (<= 90d), at_risk (91-360d), churned (> 360d), never_used (sem transação)  
-**Testes**: `client_id` unique + not_null; `engagement_status` accepted_values; `account_count` >= 1; `transaction_count` >= 0  
+**Testes**: `client_sk` unique + not_null; `engagement_status` accepted_values; `account_count` >= 1; `transaction_count` >= 0  
 **Fonte**: `stg_clientes`, `stg_contas`, `stg_transacoes`, `stg_propostas_credito`
 
 ---

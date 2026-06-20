@@ -21,7 +21,7 @@ order by clientes desc;
 
 -- 3. Top 20 clientes em risco de churn com maior saldo (retencao) - Camila
 select
-    client_id,
+    client_sk,
     client_full_name,
     total_balance,
     transaction_count,

@@ -48,7 +48,7 @@ tx_por_cliente as (
 
 final as (
     select
-        cl.client_id,
+        cl.client_id as client_sk,
         cl.client_full_name,
         cl.client_type,
         cl.onboarding_date::date as onboarding_date,

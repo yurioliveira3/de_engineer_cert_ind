@@ -98,6 +98,7 @@ lint:
 	ruff format --check dags/ tests/
 	yamllint -c .yamllint meltano/meltano.yml docker-compose.yml
 	sqlfluff lint dbt_project/models
+	sqlfluff lint queries/
 
 lint-sql:
 	sqlfluff lint dbt_project/models

@@ -11,7 +11,7 @@ with propostas_com_agencia as (
 
 aggregated as (
     select
-        a.agency_id,
+        a.agency_id as agency_sk,
         a.agency_name,
         a.agency_type,
         count(p.proposal_id) as total_proposals,

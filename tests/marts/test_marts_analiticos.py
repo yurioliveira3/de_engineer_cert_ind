@@ -18,11 +18,11 @@ EXPECTED_DRIVERS = {
 
 
 @pytest.mark.integration
-def test_engajamento_client_id_unique(dw_conn) -> None:
-    """mart_engajamento_cliente: client_id e PK (sem duplicatas)."""
+def test_engajamento_client_sk_unique(dw_conn) -> None:
+    """mart_engajamento_cliente: client_sk e PK (sem duplicatas)."""
     with dw_conn.cursor() as cur:
         cur.execute(
-            "SELECT count(*) - count(distinct client_id) FROM marts.mart_engajamento_cliente"
+            "SELECT count(*) - count(distinct client_sk) " "FROM marts.mart_engajamento_cliente"
         )
         assert cur.fetchone()[0] == 0
 

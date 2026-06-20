@@ -19,7 +19,7 @@ models:
   - name: fct_performance_agencia
     description: "Agency-level credit proposal performance and conversion rates."
     columns:
-      - name: agency_id
+      - name: agency_sk
         tests:
           - unique
           - not_null
@@ -42,7 +42,7 @@ models:
   - name: fct_atividade_contas
     description: "Account activity classification (active, dormant, never_used)."
     columns:
-      - name: account_id
+      - name: account_sk
         tests:
           - unique
           - not_null
@@ -98,11 +98,11 @@ models:
   - name: mart_oportunidade_crosssell
     description: "Clients with high balance and zero approved credit proposals - cross-sell opportunities."
     columns:
-      - name: client_id
+      - name: client_fk
         tests:
           - unique
           - not_null
-      - name: account_id
+      - name: account_fk
         tests:
           - not_null
       - name: total_balance
@@ -115,7 +115,7 @@ models:
       recência, status de engajamento (active/at_risk/churned/never_used), saldo
       total e posse de crédito aprovado. Grão: 1 linha por cliente com conta.
     columns:
-      - name: client_id
+      - name: client_sk
         tests:
           - unique
           - not_null

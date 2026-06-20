@@ -33,6 +33,9 @@ jobs:
       - name: sqlfluff - modelos dbt
         run: sqlfluff lint dbt_project/models
 
+      - name: sqlfluff - queries Metabase
+        run: sqlfluff lint queries/
+
   # -- Job 2: testes unitários (DAG, resiliência, config, cobertura) --
   dag-tests:
     name: Testes unitários (sem DB)

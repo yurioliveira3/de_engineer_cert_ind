@@ -6,11 +6,11 @@ with clientes_com_credito_aprovado as (
 
 oportunidades as (
     select
-        cl.client_id,
+        cl.client_id as client_fk,
         cl.client_full_name,
-        c.account_id,
+        c.account_id as account_fk,
         c.total_balance,
-        c.agency_id
+        c.agency_id as agency_fk
     from {{ ref('stg_contas') }} c
     inner join {{ ref('stg_clientes') }} cl
         on c.client_id = cl.client_id
