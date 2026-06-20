@@ -227,7 +227,7 @@ Isso gera `k8s/secrets.yaml` com os dois objetos `Secret` (`banvic-secrets` e
 #    O chart 1.13.0 é baixado do GitHub, instalado e o .tgz removido automaticamente.
 make kind-deploy
 
-# 6. Aguarde os pods ficarem 1/1 Running (scheduler e triggerer ficam 2/2)
+# 6. Aguarde os pods ficarem 1/1 Running (scheduler fica 2/2)
 kubectl get pods -n banvic -w
 
 # 7. Após os pods ficarem prontos, crie o usuário admin com a senha do .env
@@ -575,14 +575,16 @@ make test              # 41 testes unitários (sem banco)
 make test-integration  # 31 testes de integração (requer make up + DAG rodada)
 
 # Linting
-make lint              # ruff + yamllint + sqlfluff
+make lint              # ruff check + ruff format --check + yamllint + sqlfluff (modelos dbt + queries/)
 make lint-sql          # sqlfluff nos modelos dbt
 make fix-sql           # sqlfluff fix (auto-corrige estilo SQL)
 
 # Kubernetes / Kind
 make kind-up           # cria cluster Kind
 make kind-load         # build da imagem + carrega no Kind
+make kind-secrets      # gera k8s/secrets.yaml a partir do .env
 make kind-deploy       # aplica namespace, secrets, postgres, airflow-db, metabase + PV de logs
+make kind-start        # atalho: kind-up + kind-load + kind-secrets + kind-deploy + admin
 make kind-upgrade      # aplica mudanças do values.yaml sem recriar o cluster
 make kind-test         # 41 testes unitários no pod do scheduler Kind
 make kind-down         # destrói o cluster
