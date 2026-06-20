@@ -38,8 +38,10 @@ spec:
         readinessProbe:
           exec:
             command: ["pg_isready", "-U", "airflow", "-d", "airflow"]
-          initialDelaySeconds: 10
-          periodSeconds: 5
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
   volumeClaimTemplates:
   - metadata:
       name: data
@@ -60,4 +62,4 @@ spec:
   ports:
   - port: 5432
     targetPort: 5432
-  clusterIP: None
+  publishNotReadyAddresses: true

@@ -75,9 +75,40 @@ webserver:
       nodePort: 30080
   defaultUser:
     enabled: false
+  startupProbe:
+    failureThreshold: 20
+  livenessProbe:
+    initialDelaySeconds: 30
+    failureThreshold: 10
+  readinessProbe:
+    initialDelaySeconds: 30
+    failureThreshold: 10
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+scheduler:
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
 
 # Usar postgres externo (airflow-db StatefulSet com postgres:16)
 postgresql:
+  enabled: false
+
+# Reduzir footprint em ambientes com memória limitada
+triggerer:
+  enabled: false
+
+statsd:
   enabled: false
 
 data:

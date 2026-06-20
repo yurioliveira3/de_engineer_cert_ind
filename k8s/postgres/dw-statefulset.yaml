@@ -52,9 +52,11 @@ spec:
           mountPath: /docker-entrypoint-initdb.d
         readinessProbe:
           exec:
-            command: ["pg_isready", "-U", "analytics"]
-          initialDelaySeconds: 10
-          periodSeconds: 5
+            command: ["pg_isready", "-U", "analytics", "-d", "analytics_dw"]
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
       volumes:
       - name: init-scripts
         configMap:
@@ -81,4 +83,4 @@ spec:
   ports:
   - port: 5432
     targetPort: 5432
-  clusterIP: None
+  publishNotReadyAddresses: true
